@@ -8,6 +8,14 @@ section .data
 section .text
     global _start
 
+print_banner:
+    mov eax,4
+    mov ebx,1
+    mov ecx,banner
+    mov edx,banner_len
+    int 80h
+    ret
+
 prompt:
     mov eax,4
     mov ebx,1
@@ -17,13 +25,7 @@ prompt:
     ret
 
 _start:
-	; write string to fd 1 (stdout)
-    mov eax,4
-    mov ebx,1
-    mov ecx,banner
-    mov edx,banner_len
-    int 80h
-
+    call print_banner
     call prompt
 
 	; exit w/0
