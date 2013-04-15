@@ -117,6 +117,15 @@ _token:
     call _push
     ret
 
+_S0:
+    mov eax, dstack
+    call _push
+    ret
+
+_tickS:
+    mov eax, [dsp]
+    call _push
+    ret
 
 ; -----------------------------
 ; 
