@@ -67,30 +67,26 @@ _number:
     pop edx ; string pointer
     push eax
     mov eax, 0
-
-number_loop:
+.numloop:
     imul eax, 10 ; ok to do when eax = 0 b/c 0*10 still = 0
     mov ebx, 0
     mov bl, [edx] ; bl = (char)*p
     cmp ebx, 30h ; '0'
-    jl bad_char
+    jl .badchar
     cmp ebx, 39h ; '9'
-    jg bad_char
+    jg .badchar
     sub ebx, 30h ; difference is decimal 0..9
     add eax, ebx
-
+    ; check for last char
     cmp ecx, 1
-    je number_done
-
+    je .numexit
     ; prepare for next digit
     dec ecx
     inc edx
-    jmp number_loop
-
-bad_char:
-number_done:
-    call _push ; uses eax
-
+    jmp .numloop
+.badchar:
+.numexit:
+    call _push ; uses eax - push result on data stack
     ret
 
 
@@ -102,27 +98,23 @@ _token:
     pop ecx
     pop ebx
     push eax
-
     mov edx, 0
-token_loop:
+.tokenloop:
     cmp ecx, 0
-    je token_loop_done
-
+    je .tokenexit
     ; read byte and check if space/tab
     mov eax, 0
     mov al, [ebx]
     cmp al, 20h ; space (ASCII 32)
-    je token_loop_done
+    je .tokenexit
     cmp al, 9h ; tab
-    je token_loop_done
-
+    je .tokenexit
     ; prep for next char (if any)
     inc ebx
     inc edx
     dec ecx
-    jmp token_loop
-
-token_loop_done:
+    jmp .tokenloop
+.tokenexit:
     mov eax, edx
     call _push
     ret
@@ -140,7 +132,6 @@ init:
     ; assign sentinel value to help to see if clobbered
     mov eax, 0badd00dh
     mov [dsentinel], eax
-
     ; compute top
     mov eax, dsentinel
     mov [dsp], eax
@@ -148,25 +139,23 @@ init:
 
 ; ( -- x1 x2 xN pushes <ecx> values of <x> onto the Forth data stack )
 _pushN:
-push_n_loop:
+.pushnloop:
     cmp ecx, 0
-    je push_n_return
+    je .pushnexit
     call _push
     dec ecx
-    jmp push_n_loop
-push_n_return:
+    jmp .pushnloop
+.pushnexit:
     ret
 
 ; ( -- , returns the size of the stack in <eax> )
 stack_size:
     pop ecx
-
     ; dsentinal - 4 bytes = top
     mov eax, dsentinel
     mov ebx, [dsp]
     sub eax, ebx
     shr eax, 2 ; divide by 4 to return #cells difference, not bytes
-
     jmp ecx ; popped above
 
 ; x86 stack: ( s l -- , prints <l> bytes of the string pointed to by <s> to stdout )
@@ -217,7 +206,6 @@ _start:
 _uforth:
     call init
     call print_banner
-
     call test
     mov ebx, eax
     mov eax, 1 ; sys_exit
