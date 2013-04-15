@@ -3,6 +3,15 @@ EXECUTABLE=uforth
 SOURCES=uforth.asm
 OBJECTS=uforth.o
 
+AS=nasm
+ASFLAGS=-g -f elf
+
+RM=rm -f
+
+LD=ld
+LDFLAGS=
+#LDFLAGS=-s
+
 # delete default suffix list
 .SUFFIXES:
 
@@ -17,11 +26,11 @@ run: $(EXECUTABLE)
 	@./$(EXECUTABLE)
 
 $(EXECUTABLE): $(OBJECTS)
-	@ld -s -o $(EXECUTABLE) $(OBJECTS)
+	@$(LD) $(LDFLAGS) -o $(EXECUTABLE) $(OBJECTS)
 
 .asm.o:
-	@nasm -f elf $<
+	@$(AS) $(ASFLAGS) $<
 
 clean:
-	@rm -f $(EXECUTABLE) $(OBJECTS)
+	@$(RM) $(EXECUTABLE) $(OBJECTS)
 
