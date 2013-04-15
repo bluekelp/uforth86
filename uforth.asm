@@ -1,6 +1,6 @@
 
 section .data
-    banner: db 'uforth v0.0.3', 10
+    banner: db 'uforth v0.0.5', 10
     banner_len: equ $-banner
 
     prompt_str: db 'ok', 10
@@ -9,9 +9,9 @@ section .data
 %define STACK_SIZE 1024
 
 section .bss
-    dstack: resd STACK_SIZE
-    dsentinel: resd 1
-    dsp: resd 1
+    dstack: resd STACK_SIZE ; data-stack - no overflow detection
+    dsentinel: resd 1 ; top of the stack - sentinel value to detect underflow
+    dsp: resd 1 ; data-stack pointer (current stack head)
 
 section .text
     global _start
@@ -19,14 +19,13 @@ section .text
 ; -----------------------------
 ;
 ; Forth primitives
+;
+; -----------------------------
 
 ; ( -- n, pushes <edx> into the stack as a cell )
 _push:
     mov eax, [dsp]
-    dec eax
-    dec eax
-    dec eax
-    dec eax
+    sub eax, 4
     mov [eax], edx
     mov [dsp], eax
     ret
@@ -35,10 +34,7 @@ _push:
 _pop:
     mov eax, [dsp]
     mov edx, [eax]
-    inc eax
-    inc eax
-    inc eax
-    inc eax
+    add eax, 4
     mov [dsp], eax
     ret
 
@@ -56,9 +52,10 @@ _emit:
 
 ; -----------------------------
 ; 
-; support functions below
+; support functions
+; 
+; -----------------------------
 
-; void(void)
 ; ( -- , intialize stacks )
 init:
     ; assign sentinel value to help to see if clobbered
@@ -70,14 +67,7 @@ init:
     mov [dsp], eax
     ret
 
-test:
-    mov edx, 65 ; 65 = ASCII capital A
-    call _push
-    call _emit
-    ret
-
-; void(N:ecx, x:edx)
-; ( -- x1 x2 xN pushes N values of x onto the Forth data stack )
+; ( -- x1 x2 xN pushes <ecx> values of <x> onto the Forth data stack )
 _pushN:
 push_n_loop:
     cmp ecx, 0
@@ -88,8 +78,7 @@ push_n_loop:
 push_n_return:
     ret
 
-; uint:eax(void)
-; ( -- , returns (eax) the size of the stack )
+; ( -- , returns the size of the stack in <eax> )
 stack_size:
     pop ecx
 
@@ -101,8 +90,7 @@ stack_size:
 
     jmp ecx ; popped above
 
-; void( str:ecx, str_len:edx)
-; ( -- , prints the string <str> to stdout )
+; ( s l -- , prints <l> bytes of the string pointed to by <s> to stdout )
 print:
     pop eax ; return location
     pop edx ; lengh
@@ -124,6 +112,18 @@ prompt:
     push prompt_len
     call print
     ret
+
+test:
+    mov edx, 65 ; 65 = ASCII capital A
+    call _push
+    call _emit
+    ret
+
+; -----------------------------
+; 
+; entry
+; 
+; -----------------------------
 
 _start:
 _uforth:
