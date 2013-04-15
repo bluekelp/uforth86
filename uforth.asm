@@ -26,7 +26,6 @@ init:
     ; compute top
     mov eax, dsentinel
     mov [dsp], eax
-    call _push ; need this once to compute top which is desntinal-1 cells
     ret
 
 test:
@@ -66,11 +65,6 @@ stack_size:
 
     ; dsentinal - 4 bytes = top
     mov eax, dsentinel
-    dec eax
-    dec eax
-    dec eax
-    dec eax
-
     mov ebx, [dsp]
     sub eax, ebx
     shr eax, 2 ; divide by 4 to return #cells difference, not bytes
