@@ -6,7 +6,7 @@ section .data
     prompt_str: db 'ok', 10
     prompt_len: equ $-prompt_str
 
-    test_str: db '21b2'
+    test_str: db 'abc 123  d'
     test_str_len: equ $-test_str
 
 %define STACK_SIZE 1024
@@ -19,11 +19,13 @@ section .bss
 section .text
     global _start
 
+
 ; -----------------------------
 ;
 ; Forth primitives
 ;
 ; -----------------------------
+
 
 ; ( -- n, pushes <edx> into the stack as a cell )
 _push:
@@ -94,11 +96,45 @@ number_done:
 
     ret
 
+
+; x86 stack: ( s l -- )
+; ( -- n , parses a string and pushes the number of bytes in the next token )
+_token:
+    pop eax
+    pop ecx
+    pop ebx
+    push eax
+
+    mov edx, 0
+token_loop:
+    cmp ecx, 0
+    je token_loop_done
+
+    ; read byte and check if space/tab
+    mov eax, 0
+    mov al, [ebx]
+    cmp al, 20h ; space (ASCII 32)
+    je token_loop_done
+    cmp al, 9h ; tab
+    je token_loop_done
+
+    ; prep for next char (if any)
+    inc ebx
+    inc edx
+    dec ecx
+    jmp token_loop
+
+token_loop_done:
+    call _push ; expects N in <edx>
+    ret
+
+
 ; -----------------------------
 ; 
 ; support functions
 ; 
 ; -----------------------------
+
 
 ; ( -- , intialize stacks )
 init:
@@ -158,9 +194,11 @@ prompt:
     ret
 
 test:
-    push test_str
+    mov eax, test_str
+    add eax, 3
+    push eax
     push test_str_len
-    call _number
+    call _token
     ret
 
 ; -----------------------------
