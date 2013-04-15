@@ -28,14 +28,16 @@ init:
     mov [dsp], eax
     ret
 
+; ( -- , push a value (42) then pop it and leave value in <edx> )
 test:
-    mov edx, 0 ; value to push
-    mov ecx, 3 ; N to push
-    call _pushN
+    mov edx, 42
+    call _push
+    mov edx, 0 ; reset to ensure we check popped value
+    call _pop
     ret
 
 ; void(N:ecx, x:edx)
-; ( -- x1, x2, ..., xN, pushes N values of x onto the Forth data stack )
+; ( -- x1 x2 xN pushes N values of x onto the Forth data stack )
 _pushN:
 push_n_loop:
     cmp ecx, 0
@@ -55,6 +57,18 @@ _push:
     dec eax
     dec eax
     mov [eax], edx
+    mov [dsp], eax
+    ret
+
+; n:edx(void)
+; ( n -- , pop a cell off stack )
+_pop:
+    mov eax, [dsp]
+    mov edx, [eax]
+    inc eax
+    inc eax
+    inc eax
+    inc eax
     mov [dsp], eax
     ret
 
@@ -98,12 +112,9 @@ prompt:
 _start:
 _uforth:
     call init
-    call test
-
     call print_banner
-    call prompt
 
-    call stack_size
-    mov ebx, eax ; return value = stack size
+    call test
+    mov ebx, edx ; return value = stack size
     mov eax, 1 ; sys_exit
     int 80h
