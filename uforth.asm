@@ -27,32 +27,34 @@ section .text
 ; -----------------------------
 
 
-; ( -- n, pushes <edx> into the stack as a cell )
+; ( -- n, pushes <eax> into the stack as a cell )
 _push:
-    mov eax, [dsp]
-    sub eax, 4
-    mov [eax], edx
-    mov [dsp], eax
+    mov ebx, [dsp]
+    sub ebx, 4
+    mov [ebx], eax
+    mov [dsp], ebx
     ret
 
-; ( n -- , pop a cell off stack, leaves it in <edx> )
+; ( n -- , pop a cell off stack, leaves it in <eax> )
 _pop:
+    ; TODO cleanup register use
     mov eax, [dsp]
     mov edx, [eax]
     add eax, 4
     mov [dsp], eax
+    mov eax, edx
     ret
 
 ; ( c -- , pops a cell and prints its first byte to stdout )
 _emit:
     call _pop
-    push edx
-    mov ecx, esp ; ecx = string to write (_pop leaves in edx)
+    push eax
+    mov ecx, esp ; ecx = pointer to string to write (need pointer to we use esp trick, not eax directly)
     mov edx, 1   ; # bytes to write
     mov eax, 4 ; sys_write
     mov ebx, 1 ; fd 1 = stdout
     int 80h
-    pop edx
+    pop eax
     ret
 
 ; x86 stack: ( s l -- )
@@ -86,13 +88,8 @@ number_loop:
     jmp number_loop
 
 bad_char:
-    ;push edx
-    ;mov edx,0
-    ;idiv 10 ; undo and *try* to have correct result
-
 number_done:
-    mov edx, eax ; _push expects value in <edx>
-    call _push
+    call _push ; uses eax
 
     ret
 
@@ -100,6 +97,7 @@ number_done:
 ; x86 stack: ( s l -- )
 ; ( -- n , parses a string and pushes the number of bytes in the next token )
 _token:
+    ; TODO cleanup registers/use
     pop eax
     pop ecx
     pop ebx
@@ -125,7 +123,8 @@ token_loop:
     jmp token_loop
 
 token_loop_done:
-    call _push ; expects N in <edx>
+    mov eax, edx
+    call _push
     ret
 
 
@@ -194,11 +193,18 @@ prompt:
     ret
 
 test:
+    mov eax, '*'
+    call _push
+    call _emit
+    nop
     mov eax, test_str
-    add eax, 3
+    add eax, 0
     push eax
-    push test_str_len
+    mov eax, test_str_len
+    sub eax, 0
+    push eax
     call _token
+    call _pop
     ret
 
 ; -----------------------------
@@ -213,6 +219,6 @@ _uforth:
     call print_banner
 
     call test
-    mov ebx, edx
+    mov ebx, eax
     mov eax, 1 ; sys_exit
     int 80h
