@@ -29,20 +29,18 @@ section .text
 
 ; ( -- n, pushes <eax> into the stack as a cell )
 _push:
-    mov ebx, [dsp]
-    sub ebx, 4
-    mov [ebx], eax
-    mov [dsp], ebx
+    mov ebx, [dsp] ; load pointer
+    sub ebx, 4     ; decrement (push)
+    mov [ebx], eax ; store value
+    mov [dsp], ebx ; update pointer
     ret
 
 ; ( n -- , pop a cell off stack, leaves it in <eax> )
 _pop:
-    ; TODO cleanup register use
-    mov eax, [dsp]
-    mov edx, [eax]
-    add eax, 4
-    mov [dsp], eax
-    mov eax, edx
+    mov ebx, [dsp] ; load pointer
+    mov eax, [ebx] ; fetch value
+    add ebx, 4     ; increment (pop)
+    mov [dsp], ebx ; update pointer
     ret
 
 ; ( c -- , pops a cell and prints its first byte to stdout )
