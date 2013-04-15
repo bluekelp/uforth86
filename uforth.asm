@@ -1,3 +1,4 @@
+
 section .data
     banner: db 'uforth v0.0.3', 10
 	banner_len: equ $-banner
@@ -5,7 +6,7 @@ section .data
     prompt_str: db 'ok', 10
     prompt_len: equ $-prompt_str
 
-%define STACK_SIZE 10
+%define STACK_SIZE 1024
 
 section .bss
     dstack: resd STACK_SIZE
@@ -15,6 +16,8 @@ section .bss
 section .text
     global _start
 
+; void(void)
+; ( -- , intialize stacks )
 init:
     ; assign sentinel value to help to see if clobbered
     mov eax, 0badd00dh
@@ -26,10 +29,15 @@ init:
     call _push ; need this once to compute top which is desntinal-1 cells
     ret
 
-; push ecx values onto stack
+test:
+    mov edx, 0 ; value to push
+    mov ecx, 3 ; N to push
+    call _pushN
+    ret
+
+; void(N:ecx, x:edx)
+; ( -- x1, x2, ..., xN, pushes N values of x onto the Forth data stack )
 _pushN:
-    pop eax
-    ; ecx assumed set by caller
 push_n_loop:
     cmp ecx, 0
     je push_n_return
@@ -37,8 +45,10 @@ push_n_loop:
     dec ecx
     jmp push_n_loop
 push_n_return:
-    jmp eax ; popped above
+    ret
 
+; void(n:edx)
+; ( -- n, pushes edx onto the stack )
 _push:
     mov eax, [dsp]
     dec eax
@@ -49,6 +59,8 @@ _push:
     mov [dsp], eax
     ret
 
+; uint:eax(void)
+; ( -- , returns (eax) the size of the stack )
 stack_size:
     pop ecx
 
@@ -62,10 +74,11 @@ stack_size:
     mov ebx, [dsp]
     sub eax, ebx
     shr eax, 2 ; divide by 4 to return #cells difference, not bytes
-    push eax
 
     jmp ecx ; popped above
 
+; void( str:ecx, str_len:edx)
+; ( -- , prints the string <str> to stdout )
 print:
     pop eax ; return location
     pop edx ; lengh
@@ -89,11 +102,14 @@ prompt:
     ret
 
 _start:
+_uforth:
     call init
+    call test
+
     call print_banner
     call prompt
 
     call stack_size
-    pop ebx ; return code
+    mov ebx, eax ; return value = stack size
     mov eax, 1 ; sys_exit
     int 80h
