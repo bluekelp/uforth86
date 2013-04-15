@@ -1,7 +1,7 @@
 
 section .data
     banner: db 'uforth v0.0.3', 10
-	banner_len: equ $-banner
+    banner_len: equ $-banner
 
     prompt_str: db 'ok', 10
     prompt_len: equ $-prompt_str
