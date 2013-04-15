@@ -19,6 +19,20 @@ section .bss
 section .text
     global _start
 
+%macro directcall 1
+    ; nothing
+%endmacro
+
+%macro cprologue 1
+    push ebp
+    mov ebp, esp
+    sub esp, %1
+%endmacro
+
+%macro creturn 0
+    pop ebp
+    ret
+%endmacro
 
 ; -----------------------------
 ;
@@ -29,6 +43,7 @@ section .text
 
 ; ( -- n, pushes <eax> into the stack as a cell )
 _push:
+    directcall 4
     mov ebx, [dsp] ; load pointer
     sub ebx, 4     ; decrement (push)
     mov [ebx], eax ; store value
@@ -37,6 +52,7 @@ _push:
 
 ; ( n -- , pop a cell off stack, leaves it in <eax> )
 _pop:
+    directcall 4
     mov ebx, [dsp] ; load pointer
     mov eax, [ebx] ; fetch value
     add ebx, 4     ; increment (pop)
@@ -45,6 +61,7 @@ _pop:
 
 ; ( c -- , pops a cell and prints its first byte to stdout )
 _emit:
+    directcall 0
     call _pop
     push eax
     mov ecx, esp ; ecx = pointer to string to write (need pointer to we use esp trick, not eax directly)
@@ -60,6 +77,7 @@ _emit:
 ; undefined if <l> less than 1
 ; <n> will by 10x too large if we encounter an ASCII char outside '0'..'9' but otherwise ok
 _number:
+    directcall 0
     pop eax
     pop ecx ; length
     pop edx ; string pointer
