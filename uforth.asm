@@ -16,6 +16,48 @@ section .bss
 section .text
     global _start
 
+; -----------------------------
+;
+; Forth primitives
+
+; ( -- n, pushes <edx> into the stack as a cell )
+_push:
+    mov eax, [dsp]
+    dec eax
+    dec eax
+    dec eax
+    dec eax
+    mov [eax], edx
+    mov [dsp], eax
+    ret
+
+; ( n -- , pop a cell off stack, leaves it in <edx> )
+_pop:
+    mov eax, [dsp]
+    mov edx, [eax]
+    inc eax
+    inc eax
+    inc eax
+    inc eax
+    mov [dsp], eax
+    ret
+
+; ( c -- , pops a cell and prints its first byte to stdout )
+_emit:
+    call _pop
+    push edx
+    mov ecx, esp ; ecx = string to write (_pop leaves in edx)
+    mov edx, 1   ; # bytes to write
+    mov eax, 4 ; sys_write
+    mov ebx, 1 ; fd 1 = stdout
+    int 80h
+    pop edx
+    ret
+
+; -----------------------------
+; 
+; support functions below
+
 ; void(void)
 ; ( -- , intialize stacks )
 init:
@@ -28,12 +70,10 @@ init:
     mov [dsp], eax
     ret
 
-; ( -- , push a value (42) then pop it and leave value in <edx> )
 test:
-    mov edx, 42
+    mov edx, 65 ; 65 = ASCII capital A
     call _push
-    mov edx, 0 ; reset to ensure we check popped value
-    call _pop
+    call _emit
     ret
 
 ; void(N:ecx, x:edx)
@@ -46,30 +86,6 @@ push_n_loop:
     dec ecx
     jmp push_n_loop
 push_n_return:
-    ret
-
-; void(n:edx)
-; ( -- n, pushes edx onto the stack )
-_push:
-    mov eax, [dsp]
-    dec eax
-    dec eax
-    dec eax
-    dec eax
-    mov [eax], edx
-    mov [dsp], eax
-    ret
-
-; n:edx(void)
-; ( n -- , pop a cell off stack )
-_pop:
-    mov eax, [dsp]
-    mov edx, [eax]
-    inc eax
-    inc eax
-    inc eax
-    inc eax
-    mov [dsp], eax
     ret
 
 ; uint:eax(void)
