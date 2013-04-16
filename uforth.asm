@@ -34,6 +34,26 @@ section .text
     ret
 %endmacro
 
+%macro @PUSH_EAX 0
+    call _push_asm
+%endmacro
+
+%macro @POP_EAX 0
+    call _pop_asm
+%endmacro
+
+%macro @EMIT 0
+    call _emit_asm
+%endmacro
+
+%macro @TOKEN 0
+    call _token_asm
+%endmacro
+
+%macro @NUMBER 0
+    call _number_asm
+%endmacro
+
 ; -----------------------------
 ;
 ; Forth primitives
@@ -42,7 +62,12 @@ section .text
 
 
 ; ( -- n, pushes <eax> into the stack as a cell )
-_push:
+PUSH_EAX:
+db 8,'push_eax' ; #byte in name, name
+dd 0            ; link pointer
+dd _push_asm    ; code pointer
+                ; param field empty - primitive assembly
+_push_asm:
     directcall 4
     mov ebx, [dsp] ; load pointer
     sub ebx, 4     ; decrement (push)
@@ -51,18 +76,28 @@ _push:
     ret
 
 ; ( n -- , pop a cell off stack, leaves it in <eax> )
-_pop:
+POP_EAX:
+db 7,'pop_eax'  ; #byte in name, name
+dd PUSH_EAX     ; link pointer
+dd _pop_asm     ; code pointer
+                ; param field empty - primitive assembly
+_pop_asm:
     directcall 4
     mov ebx, [dsp] ; load pointer
-    mov eax, [ebx] ; fetch value
+    mov eax, [ebx] ; fetch value            <-----
     add ebx, 4     ; increment (pop)
     mov [dsp], ebx ; update pointer
     ret
 
 ; ( c -- , pops a cell and prints its first byte to stdout )
-_emit:
+EMIT:
+db 4,'emit'     ; #byte in name, name
+dd POP_EAX      ; link pointer
+dd _emit_asm    ; code pointer
+                ; param field empty - primitive assembly
+_emit_asm:
     directcall 0
-    call _pop
+    @POP_EAX
     push eax
     mov ecx, esp ; ecx = pointer to string to write (need pointer to we use esp trick, not eax directly)
     mov edx, 1   ; # bytes to write
@@ -76,7 +111,12 @@ _emit:
 ; ( -- n , parses a decimal number from <s> of length <l> and pushes it on the stack )
 ; undefined if <l> less than 1
 ; <n> will by 10x too large if we encounter an ASCII char outside '0'..'9' but otherwise ok
-_number:
+NUMBER:
+db 6,'number'   ; #byte in name, name
+dd EMIT         ; link pointer
+dd _number_asm  ; code pointer
+                ; param field empty - primitive assembly
+_number_asm:
     directcall 0
     pop eax
     pop ecx ; length
@@ -102,13 +142,18 @@ _number:
     jmp .numloop
 .badchar:
 .numexit:
-    call _push ; uses eax - push result on data stack
+    @PUSH_EAX ; uses eax - push result on data stack
     ret
 
 
 ; x86 stack: ( s l -- )
 ; ( -- n , parses a string and pushes the number of bytes in the next token )
-_token:
+TOKEN:
+db 5,'token'    ; #byte in name, name
+dd NUMBER       ; link pointer
+dd _token_asm   ; code pointer
+                ; param field empty - primitive assembly
+_token_asm:
     ; TODO cleanup registers/use
     pop eax
     pop ecx
@@ -132,18 +177,31 @@ _token:
     jmp .tokenloop
 .tokenexit:
     mov eax, edx
-    call _push
+    @PUSH_EAX
     ret
 
-_S0:
-    mov eax, dstack
-    call _push
+S0:
+db 2,'s0'       ; #byte in name, name
+dd TOKEN        ; link pointer
+dd _S0_asm      ; code pointer
+                ; param field empty - primitive assembly
+_S0_asm:
+    mov eax, dsentinel
+    @PUSH_EAX
     ret
 
-_tickS:
+TICKS:
+db 2,"'s"       ; #byte in name, name
+dd S0           ; link pointer
+dd _tickS_asm   ; code pointer
+                ; param field empty - primitive assembly
+_tickS_asm:
     mov eax, [dsp]
-    call _push
+    @PUSH_EAX
     ret
+
+H:
+    dd 0,0,0,0 ; some nulls
 
 ; -----------------------------
 ; 
@@ -167,7 +225,7 @@ _pushN:
 .pushnloop:
     cmp ecx, 0
     je .pushnexit
-    call _push
+    @PUSH_EAX
     dec ecx
     jmp .pushnloop
 .pushnexit:
@@ -208,8 +266,8 @@ prompt:
 
 test:
     mov eax, '*'
-    call _push
-    call _emit
+    @PUSH_EAX
+    @EMIT
     nop
     mov eax, test_str
     add eax, 0
@@ -217,8 +275,8 @@ test:
     mov eax, test_str_len
     sub eax, 0
     push eax
-    call _token
-    call _pop
+    @TOKEN
+    @POP_EAX
     ret
 
 ; -----------------------------
