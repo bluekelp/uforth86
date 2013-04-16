@@ -311,13 +311,19 @@ test:
     call read_line
     mov eax, [input_p]
     sub eax, input
-    add eax, '0'       ; convert to ASCII digit
+    push eax            ; length of buffer
+    add eax, '0'        ; convert to ASCII digit
     @PUSH_EAX
     @EMIT
 
     mov eax, 10
     @PUSH_EAX
     @EMIT
+
+    pop ebx             ; length of input buffer (including newline, if present)
+    push input
+    push ebx
+    call print
 
     mov eax, '*'
     @PUSH_EAX
