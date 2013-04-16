@@ -3,8 +3,11 @@ section .data
     banner: db 'uforth v0.0.5', 10
     banner_len: equ $-banner
 
-    prompt_str: db 'ok', 10
-    prompt_len: equ $-prompt_str
+    ok_str: db 'ok', 10
+    ok_len: equ $-ok_str
+
+    error_str: db 'error', 10
+    error_len: equ $-error_str
 
     test_str: db 'abc 123  d'
     test_str_len: equ $-test_str
@@ -258,9 +261,15 @@ print_banner:
     call print
     ret
 
-prompt:
-    push prompt_str
-    push prompt_len
+ok:
+    push ok_str
+    push ok_len
+    call print
+    ret
+
+error:
+    push error_str
+    push error_len
     call print
     ret
 
@@ -290,6 +299,6 @@ _uforth:
     call init
     call print_banner
     call test
-    mov ebx, eax
-    mov eax, 1 ; sys_exit
+    mov ebx, eax    ; return value of test is our exit code
+    mov eax, 1      ; sys_exit
     int 80h
