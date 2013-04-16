@@ -1,6 +1,6 @@
 
 section .data
-    banner: db 'uforth v0.0.5', 10
+    banner: db 'uforth v0.0.6', 10
     banner_len: equ $-banner
 
     ok_str: db 'ok', 10
@@ -13,11 +13,15 @@ section .data
     test_str_len: equ $-test_str
 
 %define STACK_SIZE 1024
+%define INPUT_BUFFER_SIZE 1024
 
 section .bss
-    dstack: resd STACK_SIZE ; data-stack - no overflow detection
-    dsentinel: resd 1 ; top of the stack - sentinel value to detect underflow
-    dsp: resd 1 ; data-stack pointer (current stack head)
+    dstack:     resd STACK_SIZE ; data-stack - no overflow detection
+    dsentinel:  resd 1          ; top of the stack - sentinel value to detect underflow
+    dsp:        resd 1          ; data-stack pointer (current stack head)
+    h:          resd 1          ; H - end of dictionary
+    input:      resb INPUT_BUFFER_SIZE
+    input_p:    resd 1          ; pointer to current location in input
 
 section .text
     global _start
@@ -212,15 +216,45 @@ H:
 ; 
 ; -----------------------------
 
+read_char:
+    mov ecx, [input_p]  ; where to read
+    mov edx, 1          ; # bytes to read
+    mov eax, 3          ; sys_read
+    mov ebx, 0          ; fd 0 = stdin
+    int 80h
+    cmp eax, 1          ; # bytes read
+    je  .readcharok
+.readerr:
+    mov eax, 0
+    ret
+.readcharok:
+    mov eax, [input_p]
+    mov al,  [eax]
+    add [input_p], DWORD 1  ; increment by a byte, not an int
+    ret
+
+read_line:
+.readlineloop:
+    mov eax, 0
+    call read_char
+    cmp eax, 0       ; error
+    je .readlineerr
+    cmp al, 10       ; newline
+    je  .readlineok
+    jmp .readlineloop
+.readlineerr:
+    call error
+    ret
+.readlineok:
+    call ok
+    ret
 
 ; ( -- , intialize stacks )
 init:
-    ; assign sentinel value to help to see if clobbered
-    mov eax, 0badd00dh
-    mov [dsentinel], eax
-    ; compute top
-    mov eax, dsentinel
-    mov [dsp], eax
+    mov [dsentinel], DWORD 0badd00dh    ; assign sentinel value to help to see if clobbered
+    mov [dsp], DWORD dsentinel          ; compute top of stack/S0
+    mov [h], DWORD H                    ; set H
+    mov [input_p], DWORD input
     ret
 
 ; ( -- x1 x2 xN pushes <ecx> values of <x> onto the Forth data stack )
@@ -274,10 +308,21 @@ error:
     ret
 
 test:
+    call read_line
+    mov eax, [input_p]
+    sub eax, input
+    add eax, '0'       ; convert to ASCII digit
+    @PUSH_EAX
+    @EMIT
+
+    mov eax, 10
+    @PUSH_EAX
+    @EMIT
+
     mov eax, '*'
     @PUSH_EAX
     @EMIT
-    nop
+
     mov eax, test_str
     add eax, 0
     push eax
