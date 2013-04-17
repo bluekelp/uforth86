@@ -1,30 +1,37 @@
 
+%define TAB     9
+%define SPACE   ' '         ; ASCII 20h
+%define CR      13
+%define NEWLINE 10
+%define NL      NEWLINE
+%define ENTER   NEWLINE
+
 section .data
-    banner: db 'uforth v0.0.6', 10
-    banner_len: equ $-banner
+    banner:         db 'uforth v0.0.6', NL
+    banner_len:     equ $-banner
 
-    ok_str: db 'ok', 10
-    ok_len: equ $-ok_str
+    ok_str:         db 'ok', NL
+    ok_len:         equ $-ok_str
 
-    error_str: db 'error', 10
-    error_len: equ $-error_str
+    error_str:      db 'error', NL
+    error_len:      equ $-error_str
 
-    test_str: db 'abc 123  d'
-    test_str_len: equ $-test_str
+    test_str:       db 'abc 123  d'
+    test_str_len:   equ $-test_str
 
 %define STACK_SIZE 1024
 %define INPUT_BUFSIZE 1024
 %define SCRATCH_BUFSIZE 128
 
 section .bss
-    dstack:     resd STACK_SIZE ; data-stack - no overflow detection
-    dsentinel:  resd 1          ; top of the stack - sentinel value to detect underflow
-    dsp:        resd 1          ; data-stack pointer (current stack head)
-    h:          resd 1          ; H - end of dictionary
-    input:      resb INPUT_BUFSIZE
-    input_p:    resd 1          ; pointer to current location in input
-    scratch:    resb SCRATCH_BUFSIZE ; tmp buffer to use
-    scratchp:   resd 1          ; tmp int to use
+    dstack:         resd STACK_SIZE         ; data-stack - no overflow detection
+    dsentinel:      resd 1                  ; top of the stack - sentinel value to detect underflow
+    dsp:            resd 1                  ; data-stack pointer (current stack head)
+    h:              resd 1                  ; H - end of dictionary
+    input:          resb INPUT_BUFSIZE
+    input_p:        resd 1                  ; pointer to current location in input
+    scratch:        resb SCRATCH_BUFSIZE    ; tmp buffer to use
+    scratchp:       resd 1                  ; tmp int to use
 
 section .text
     global _start
@@ -35,12 +42,12 @@ section .text
 
 %macro cprologue 1
     push ebp
-    mov ebp, esp
-    sub esp, %1
+    mov  ebp, esp
+    sub  esp, %1
 %endmacro
 
 %macro creturn 0
-    pop ebp
+    pop  ebp
     ret
 %endmacro
 
@@ -79,10 +86,10 @@ dd _push_asm    ; code pointer
                 ; param field empty - primitive assembly
 _push_asm:
     directcall 4
-    mov ebx, [dsp] ; load pointer
-    sub ebx, 4     ; decrement (push)
-    mov [ebx], eax ; store value
-    mov [dsp], ebx ; update pointer
+    mov  ebx, [dsp]         ; load pointer
+    sub  ebx, 4             ; decrement (push)
+    mov  [ebx], eax         ; store value
+    mov  [dsp], ebx         ; update pointer
     ret
 
 ; ( n -- , pop a cell off stack, leaves it in <eax> )
@@ -93,10 +100,10 @@ dd _pop_asm     ; code pointer
                 ; param field empty - primitive assembly
 _pop_asm:
     directcall 4
-    mov ebx, [dsp] ; load pointer
-    mov eax, [ebx] ; fetch value            <-----
-    add ebx, 4     ; increment (pop)
-    mov [dsp], ebx ; update pointer
+    mov  ebx, [dsp]         ; load pointer
+    mov  eax, [ebx] ; <---- ; fetch value
+    add  ebx, 4             ; increment (pop)
+    mov  [dsp], ebx         ; update pointer
     ret
 
 ; ( c -- , pops a cell and prints its first byte to stdout )
@@ -109,12 +116,12 @@ _emit_asm:
     directcall 0
     @POP_EAX
     push eax
-    mov ecx, esp ; ecx = pointer to string to write (need pointer to we use esp trick, not eax directly)
-    mov edx, 1   ; # bytes to write
-    mov eax, 4 ; sys_write
-    mov ebx, 1 ; fd 1 = stdout
-    int 80h
-    pop eax
+    mov  ecx, esp           ; ecx = ptr to str to write (need ptr so we use esp trick, not eax directly)
+    mov  edx, 1             ; # bytes to write
+    mov  eax, 4             ; sys_write
+    mov  ebx, 1             ; fd 1 = stdout
+    int  80h
+    pop  eax
     ret
 
 ; x86 stack: ( s l -- )
@@ -122,37 +129,37 @@ _emit_asm:
 ; undefined if <l> less than 1
 ; <n> will by 10x too large if we encounter an ASCII char outside '0'..'9' but otherwise ok
 NUMBER:
-db 6,'number'   ; #byte in name, name
-dd EMIT         ; link pointer
-dd _number_asm  ; code pointer
-                ; param field empty - primitive assembly
+db 6,'number'               ; #byte in name, name
+dd EMIT                     ; link pointer
+dd _number_asm              ; code pointer
+                            ; param field empty - primitive assembly
 _number_asm:
     directcall 0
-    pop eax
-    pop ecx ; length
-    pop edx ; string pointer
+    pop  eax
+    pop  ecx                ; length
+    pop  edx                ; string pointer
     push eax
-    mov eax, 0
+    mov  eax, 0
 .numloop:
-    imul eax, 10 ; ok to do when eax = 0 b/c 0*10 still = 0
-    mov ebx, 0
-    mov bl, [edx] ; bl = (char)*p
-    cmp ebx, 30h ; '0'
-    jl .badchar
-    cmp ebx, 39h ; '9'
-    jg .badchar
-    sub ebx, 30h ; difference is decimal 0..9
-    add eax, ebx
+    imul eax, 10            ; 10 = base; ok to do when eax = 0 b/c 0*10 still = 0
+    mov  ebx, 0
+    mov  bl, [edx]          ; bl = (char)*p
+    cmp  ebx, '0'
+    jl   .badchar
+    cmp  ebx, '9'
+    jg   .badchar
+    sub  ebx, '0'           ; difference is decimal 0..9
+    add  eax, ebx
+    cmp  ecx, 1
     ; check for last char
-    cmp ecx, 1
-    je .numexit
+    je   .numexit
     ; prepare for next digit
-    dec ecx
-    inc edx
-    jmp .numloop
+    dec  ecx
+    inc  edx
+    jmp  .numloop
 .badchar:
 .numexit:
-    @PUSH_EAX ; uses eax - push result on data stack
+    @PUSH_EAX               ; uses eax - push result on data stack
     ret
 
 
@@ -165,28 +172,28 @@ dd _token_asm   ; code pointer
                 ; param field empty - primitive assembly
 _token_asm:
     ; TODO cleanup registers/use
-    pop eax
-    pop ecx
-    pop ebx
+    pop  eax
+    pop  ecx
+    pop  ebx
     push eax
-    mov edx, 0
+    mov  edx, 0
 .tokenloop:
-    cmp ecx, 0
-    je .tokenexit
+    cmp  ecx, 0
+    je   .tokenexit
     ; read byte and check if space/tab
-    mov eax, 0
-    mov al, [ebx]
-    cmp al, 20h ; space (ASCII 32)
-    je .tokenexit
-    cmp al, 9h ; tab
-    je .tokenexit
+    mov  eax, 0
+    mov  al, [ebx]
+    cmp  al, SPACE
+    je   .tokenexit
+    cmp  al, TAB
+    je   .tokenexit
     ; prep for next char (if any)
-    inc ebx
-    inc edx
-    dec ecx
-    jmp .tokenloop
+    inc  ebx
+    inc  edx
+    dec  ecx
+    jmp  .tokenloop
 .tokenexit:
-    mov eax, edx
+    mov  eax, edx
     @PUSH_EAX
     ret
 
@@ -196,7 +203,7 @@ dd TOKEN        ; link pointer
 dd _S0_asm      ; code pointer
                 ; param field empty - primitive assembly
 _S0_asm:
-    mov eax, dsentinel
+    mov  eax, dsentinel
     @PUSH_EAX
     ret
 
@@ -206,12 +213,12 @@ dd S0           ; link pointer
 dd _tickS_asm   ; code pointer
                 ; param field empty - primitive assembly
 _tickS_asm:
-    mov eax, [dsp]
+    mov  eax, [dsp]
     @PUSH_EAX
     ret
 
 H:
-    dd 0,0,0,0 ; some nulls
+    dd 0,0,0,0              ; some nulls
 
 ; -----------------------------
 ; 
@@ -223,72 +230,72 @@ H:
 itoa:
     ; eax = number to convert
     mov  [scratchp], DWORD scratch    ; scratchp = &scratch
-    mov  ecx, [scratchp]; ecx = scratchp
-    mov  ebx, 10        ; radix
+    mov  ecx, [scratchp]    ; ecx = scratchp
+    mov  ebx, 10            ; radix
 .itoaloop:
-    mov  edx, 0         ; upper portion of number to divide - set to 0 to just use eax
-    idiv ebx            ; divides eax by ebx
+    mov  edx, 0             ; upper portion of number to divide - set to 0 to just use eax
+    idiv ebx                ; divides eax by ebx
     ; edx=remainder eax=quotient
-    add  edx, '0'       ; convert to ASCII char
-    mov  [ecx], dl ; (char*)*scratchp = (byte)edx
+    add  edx, '0'           ; convert to ASCII char
+    mov  [ecx], dl          ; (char*)*scratchp = (byte)edx
     inc  ecx
     cmp  eax, 0
-    jne  .itoaloop      ; next char if more (if eax > ebx (radix))
+    jne  .itoaloop          ; next char if more (if eax > ebx (radix))
 .itoaexit:
-    mov  [scratchp], ecx ; scratchp = ecx (stores all increments)
+    mov  [scratchp], ecx    ; scratchp = ecx (stores all increments)
     ; reverse bytes in scratch
-    mov  eax, ecx       ; eax = ecx = scratchp
-    sub  eax, scratch   ; length of string in scratch
-    push eax            ; length of scratch string
-    mov  ebx, scratch   ; addr of first char
+    mov  eax, ecx           ; eax = ecx = scratchp
+    sub  eax, scratch       ; length of string in scratch
+    push eax                ; length of scratch string
+    mov  ebx, scratch       ; addr of first char
     mov  ecx, [scratchp]
-    dec  ecx            ; addr of last char
+    dec  ecx                ; addr of last char
     call reverse_bytes
-    pop  eax            ; length of string
+    pop  eax                ; length of string
     ret
 
 ; ebx - pointer to start of buffer
 ; ecx - pointer to   end of buffer (inclusive)
 reverse_bytes:
 .reverseloop:
-    cmp  ebx, ecx       ; src <= dest?
-    jae  .reverseexit   ; jae = unsigned, jge = signed
-    mov  al, [ebx]      ; al = *src
-    mov  dl, [ecx]      ; dl = *dest
-    mov  [ebx], dl      ; *src = dl
-    mov  [ecx], al      ; *dest = al
-    inc  ebx            ; src++
-    dec  ecx            ; dest--
+    cmp  ebx, ecx           ; src <= dest?
+    jae  .reverseexit       ; jae = unsigned, jge = signed
+    mov  al, [ebx]          ; al = *src
+    mov  dl, [ecx]          ; dl = *dest
+    mov  [ebx], dl          ; *src = dl
+    mov  [ecx], al          ; *dest = al
+    inc  ebx                ; src++
+    dec  ecx                ; dest--
     jmp  .reverseloop
 .reverseexit:
     ret
 
 read_char:
-    mov ecx, [input_p]  ; where to read
-    mov edx, 1          ; # bytes to read
-    mov eax, 3          ; sys_read
-    mov ebx, 0          ; fd 0 = stdin
-    int 80h
-    cmp eax, 1          ; # bytes read
-    je  .readcharok
+    mov  ecx, [input_p]     ; where to read
+    mov  edx, 1             ; # bytes to read
+    mov  eax, 3             ; sys_read
+    mov  ebx, 0             ; fd 0 = stdin
+    int  80h
+    cmp  eax, 1             ; # bytes read
+    je   .readcharok
 .readerr:
-    mov eax, 0
+    mov  eax, 0
     ret
 .readcharok:
-    mov eax, [input_p]
-    mov al,  [eax]
-    add [input_p], DWORD 1  ; increment by a byte, not an int
+    mov  eax, [input_p]
+    mov  al,  [eax]
+    add  [input_p], DWORD 1 ; increment by a byte, not an int
     ret
 
 read_line:
 .readlineloop:
     mov eax, 0
     call read_char
-    cmp eax, 0       ; error
-    je .readlineerr
-    cmp al, 10       ; newline
-    je  .readlineok
-    jmp .readlineloop
+    cmp  eax, 0             ; error
+    je   .readlineerr
+    cmp  al, ENTER
+    je   .readlineok
+    jmp  .readlineloop
 .readlineerr:
     call error
     ret
@@ -298,42 +305,42 @@ read_line:
 
 ; ( -- , intialize stacks )
 init:
-    mov [dsentinel], DWORD 0badd00dh    ; assign sentinel value to help to see if clobbered
-    mov [dsp], DWORD dsentinel          ; compute top of stack/S0
-    mov [h], DWORD H                    ; set H
-    mov [input_p], DWORD input
+    mov  [dsentinel], DWORD 0badd00dh    ; assign sentinel value to help to see if clobbered
+    mov  [dsp], DWORD dsentinel          ; compute top of stack/S0
+    mov  [h], DWORD H                    ; set H
+    mov  [input_p], DWORD input
     ret
 
 ; ( -- x1 x2 xN pushes <ecx> values of <x> onto the Forth data stack )
 _pushN:
 .pushnloop:
-    cmp ecx, 0
-    je .pushnexit
+    cmp  ecx, 0
+    je   .pushnexit
     @PUSH_EAX
-    dec ecx
-    jmp .pushnloop
+    dec  ecx
+    jmp  .pushnloop
 .pushnexit:
     ret
 
 ; ( -- , returns the size of the stack in <eax> )
 stack_size:
-    pop ecx
+    pop  ecx
     ; dsentinal - 4 bytes = top
-    mov eax, dsentinel
-    mov ebx, [dsp]
-    sub eax, ebx
-    shr eax, 2 ; divide by 4 to return #cells difference, not bytes
-    jmp ecx ; popped above
+    mov  eax, dsentinel
+    mov  ebx, [dsp]
+    sub  eax, ebx
+    shr  eax, 2             ; divide by 4 to return #cells difference, not bytes
+    jmp  ecx                ; popped above
 
 ; x86 stack: ( s l -- , prints <l> bytes of the string pointed to by <s> to stdout )
 print:
-    pop eax ; return location
-    pop edx ; lengh
-    pop ecx ; string location
-    push eax ; return location
-    mov eax, 4 ; sys_write
-    mov ebx, 1 ; fd 1 = stdout
-    int 80h
+    pop  eax                ; return location
+    pop  edx                ; lengh
+    pop  ecx                ; string location
+    push eax                ; return location
+    mov  eax, 4             ; sys_write
+    mov  ebx, 1             ; fd 1 = stdout
+    int  80h
     ret
 
 print_banner:
@@ -356,34 +363,34 @@ error:
 
 test:
     call read_line
-    mov eax, [input_p]
-    sub eax, input      ; length of input in eax
-    push eax            ; popped (below) for exit code
+    mov  eax, [input_p]
+    sub  eax, input         ; length of input in eax
+    push eax                ; popped (below) for exit code
 
-    call itoa           ; puts result in scratch
+    call itoa               ; puts result in scratch
 
     push scratch
-    push eax            ; length of scratch (left from itoa() call)
+    push eax                ; length of scratch (left from itoa() call)
     call print
 
-    mov eax, 10
+    mov  eax, NEWLINE
     @PUSH_EAX
     @EMIT
 
-    pop eax             ; length of input buffer (including newline, if present)
+    pop  eax                ; length of input buffer (including newline, if present)
     push input
     push eax
     call print
 
-    mov eax, '*'
+    mov  eax, '*'
     @PUSH_EAX
     @EMIT
 
-    mov eax, test_str
-    add eax, 0
+    mov  eax, test_str
+    add  eax, 0
     push eax
-    mov eax, test_str_len
-    sub eax, 0
+    mov  eax, test_str_len
+    sub  eax, 0
     push eax
     @TOKEN
     @POP_EAX
@@ -400,6 +407,6 @@ _uforth:
     call init
     call print_banner
     call test
-    mov ebx, eax    ; return value of test is our exit code
-    mov eax, 1      ; sys_exit
-    int 80h
+    mov  ebx, eax           ; return value of test is our exit code
+    mov  eax, 1             ; sys_exit
+    int  80h
