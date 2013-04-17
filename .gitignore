@@ -1,3 +1,11 @@
-*.o
+# compiled executable
 uforth
+
+# object files
+*.o
+
+# vim swap files
 .*.swp
+
+# symbol files for debuggers
+*.sym
