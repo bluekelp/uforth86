@@ -16,9 +16,6 @@ section .data
     error_str:      db 'error', NL
     error_len:      equ $-error_str
 
-    test_str:       db 'abc 123  d'
-    test_str_len:   equ $-test_str
-
 %define STACK_SIZE 1024
 %define INPUT_BUFSIZE 1024
 %define SCRATCH_BUFSIZE 128
@@ -280,6 +277,9 @@ reverse_bytes:
 .reverseexit:
     ret
 
+; waits for a char from stdin and stores in current location of [input_p].
+; increments <input_p> one byte when complete
+; return 0 on error/EOF or ASCII value of char read otherwise
 read_char:
     mov  ecx, [input_p]     ; where to read
     mov  edx, 1             ; # bytes to read
@@ -297,6 +297,11 @@ read_char:
     add  [input_p], DWORD 1 ; increment by a byte, not an int
     ret
 
+; read a line of input (until either ENTER inputed or EOF/error)
+; data are left in <input> buffer, location in buffer is dependent on
+; value of <input_p> when this fx is called
+; no return value
+read_string:
 read_line:
 .readlineloop:
     mov eax, 0
@@ -313,7 +318,7 @@ read_line:
     call ok
     ret
 
-; ( -- , intialize stacks )
+; init globals
 init:
     mov  [dsentinel], DWORD 0badd00dh    ; assign sentinel value to help to see if clobbered
     mov  [dsp], DWORD dsentinel          ; compute top of stack/S0
@@ -321,7 +326,7 @@ init:
     mov  [input_p], DWORD input
     ret
 
-; ( -- x1 x2 xN pushes <ecx> values of <x> onto the Forth data stack )
+; ( -- x1 x2 xN pushes <ecx> values of <eax> onto the Forth data stack )
 _pushN:
 .pushnloop:
     cmp  ecx, 0
@@ -334,13 +339,12 @@ _pushN:
 
 ; ( -- , returns the depth of the stack in <eax> )
 stack_depth:
-    pop  ecx
     ; dsentinal - 4 bytes = top
     mov  eax, dsentinel
     mov  ebx, [dsp]
     sub  eax, ebx
     shr  eax, 2             ; divide by 4 to return #cells difference, not bytes
-    jmp  ecx                ; popped above
+    ret
 
 ; x86 stack: ( s l -- , prints <l> bytes of the string pointed to by <s> to stdout )
 print:
@@ -396,14 +400,6 @@ test:
     @PUSH_EAX
     @EMIT
 
-    mov  eax, test_str
-    add  eax, 0
-    push eax
-    mov  eax, test_str_len
-    sub  eax, 0
-    push eax
-    @TOKEN
-    @POP_EAX
     ret
 
 ; -----------------------------
