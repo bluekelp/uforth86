@@ -217,6 +217,16 @@ _tickS_asm:
     @PUSH_EAX
     ret
 
+DEPTH:
+db 5,"depth"                ; #byte in name, name
+dd TICKS                    ; link pointer
+dd _depth_asm               ; code pointer
+                            ; param field empty - primitive assembly
+_depth_asm:
+    call stack_depth
+    @PUSH_EAX
+    ret
+
 H:
     dd 0,0,0,0              ; some nulls
 
