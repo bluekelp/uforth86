@@ -73,17 +73,17 @@ section .text
 
 ; -----------------------------
 ;
-; Forth primitives
+; Forth primitive words, with dictionary headers
 ;
 ; -----------------------------
 
 
 ; ( -- n, pushes <eax> into the stack as a cell )
 PUSH_EAX:
-db 8,'push_eax' ; #byte in name, name
-dd 0            ; link pointer
-dd _push_asm    ; code pointer
-                ; param field empty - primitive assembly
+db 8,'push_eax'             ; #byte in name, name
+dd 0                        ; link pointer
+dd _push_asm                ; code pointer
+                            ; param field empty - primitive assembly
 _push_asm:
     directcall 4
     mov  ebx, [dsp]         ; load pointer
@@ -94,10 +94,10 @@ _push_asm:
 
 ; ( n -- , pop a cell off stack, leaves it in <eax> )
 POP_EAX:
-db 7,'pop_eax'  ; #byte in name, name
-dd PUSH_EAX     ; link pointer
-dd _pop_asm     ; code pointer
-                ; param field empty - primitive assembly
+db 7,'pop_eax'              ; #byte in name, name
+dd PUSH_EAX                 ; link pointer
+dd _pop_asm                 ; code pointer
+                            ; param field empty - primitive assembly
 _pop_asm:
     directcall 4
     mov  ebx, [dsp]         ; load pointer
@@ -108,10 +108,10 @@ _pop_asm:
 
 ; ( c -- , pops a cell and prints its first byte to stdout )
 EMIT:
-db 4,'emit'     ; #byte in name, name
-dd POP_EAX      ; link pointer
-dd _emit_asm    ; code pointer
-                ; param field empty - primitive assembly
+db 4,'emit'                 ; #byte in name, name
+dd POP_EAX                  ; link pointer
+dd _emit_asm                ; code pointer
+                            ; param field empty - primitive assembly
 _emit_asm:
     directcall 0
     @POP_EAX
@@ -166,10 +166,10 @@ _number_asm:
 ; x86 stack: ( s l -- )
 ; ( -- n , parses a string and pushes the number of bytes in the next token )
 TOKEN:
-db 5,'token'    ; #byte in name, name
-dd NUMBER       ; link pointer
-dd _token_asm   ; code pointer
-                ; param field empty - primitive assembly
+db 5,'token'                ; #byte in name, name
+dd NUMBER                   ; link pointer
+dd _token_asm               ; code pointer
+                            ; param field empty - primitive assembly
 _token_asm:
     ; TODO cleanup registers/use
     pop  eax
@@ -198,20 +198,20 @@ _token_asm:
     ret
 
 S0:
-db 2,'s0'       ; #byte in name, name
-dd TOKEN        ; link pointer
-dd _S0_asm      ; code pointer
-                ; param field empty - primitive assembly
+db 2,'s0'                   ; #byte in name, name
+dd TOKEN                    ; link pointer
+dd _S0_asm                  ; code pointer
+                            ; param field empty - primitive assembly
 _S0_asm:
     mov  eax, dsentinel
     @PUSH_EAX
     ret
 
 TICKS:
-db 2,"'s"       ; #byte in name, name
-dd S0           ; link pointer
-dd _tickS_asm   ; code pointer
-                ; param field empty - primitive assembly
+db 2,"'s"                   ; #byte in name, name
+dd S0                       ; link pointer
+dd _tickS_asm               ; code pointer
+                            ; param field empty - primitive assembly
 _tickS_asm:
     mov  eax, [dsp]
     @PUSH_EAX
@@ -322,8 +322,8 @@ _pushN:
 .pushnexit:
     ret
 
-; ( -- , returns the size of the stack in <eax> )
-stack_size:
+; ( -- , returns the depth of the stack in <eax> )
+stack_depth:
     pop  ecx
     ; dsentinal - 4 bytes = top
     mov  eax, dsentinel
