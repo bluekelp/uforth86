@@ -13,15 +13,18 @@ section .data
     test_str_len: equ $-test_str
 
 %define STACK_SIZE 1024
-%define INPUT_BUFFER_SIZE 1024
+%define INPUT_BUFSIZE 1024
+%define SCRATCH_BUFSIZE 128
 
 section .bss
     dstack:     resd STACK_SIZE ; data-stack - no overflow detection
     dsentinel:  resd 1          ; top of the stack - sentinel value to detect underflow
     dsp:        resd 1          ; data-stack pointer (current stack head)
     h:          resd 1          ; H - end of dictionary
-    input:      resb INPUT_BUFFER_SIZE
+    input:      resb INPUT_BUFSIZE
     input_p:    resd 1          ; pointer to current location in input
+    scratch:    resb SCRATCH_BUFSIZE ; tmp buffer to use
+    scratchp:   resd 1          ; tmp int to use
 
 section .text
     global _start
@@ -216,6 +219,50 @@ H:
 ; 
 ; -----------------------------
 
+; writes eax as unsigned decimal string to <scratch> and return length in eax
+itoa:
+    ; eax = number to convert
+    mov  [scratchp], DWORD scratch    ; scratchp = &scratch
+    mov  ecx, [scratchp]; ecx = scratchp
+    mov  ebx, 10        ; radix
+.itoaloop:
+    mov  edx, 0         ; upper portion of number to divide - set to 0 to just use eax
+    idiv ebx            ; divides eax by ebx
+    ; edx=remainder eax=quotient
+    add  edx, '0'       ; convert to ASCII char
+    mov  [ecx], dl ; (char*)*scratchp = (byte)edx
+    inc  ecx
+    cmp  eax, 0
+    jne  .itoaloop      ; next char if more (if eax > ebx (radix))
+.itoaexit:
+    mov  [scratchp], ecx ; scratchp = ecx (stores all increments)
+    ; reverse bytes in scratch
+    mov  eax, ecx       ; eax = ecx = scratchp
+    sub  eax, scratch   ; length of string in scratch
+    push eax            ; length of scratch string
+    mov  ebx, scratch   ; addr of first char
+    mov  ecx, [scratchp]
+    dec  ecx            ; addr of last char
+    call reverse_bytes
+    pop  eax            ; length of string
+    ret
+
+; ebx - pointer to start of buffer
+; ecx - pointer to   end of buffer (inclusive)
+reverse_bytes:
+.reverseloop:
+    cmp  ebx, ecx       ; src <= dest?
+    jae  .reverseexit   ; jae = unsigned, jge = signed
+    mov  al, [ebx]      ; al = *src
+    mov  dl, [ecx]      ; dl = *dest
+    mov  [ebx], dl      ; *src = dl
+    mov  [ecx], al      ; *dest = al
+    inc  ebx            ; src++
+    dec  ecx            ; dest--
+    jmp  .reverseloop
+.reverseexit:
+    ret
+
 read_char:
     mov ecx, [input_p]  ; where to read
     mov edx, 1          ; # bytes to read
@@ -310,19 +357,22 @@ error:
 test:
     call read_line
     mov eax, [input_p]
-    sub eax, input
-    push eax            ; length of buffer
-    add eax, '0'        ; convert to ASCII digit
-    @PUSH_EAX
-    @EMIT
+    sub eax, input      ; length of input in eax
+    push eax            ; popped (below) for exit code
+
+    call itoa           ; puts result in scratch
+
+    push scratch
+    push eax            ; length of scratch (left from itoa() call)
+    call print
 
     mov eax, 10
     @PUSH_EAX
     @EMIT
 
-    pop ebx             ; length of input buffer (including newline, if present)
+    pop eax             ; length of input buffer (including newline, if present)
     push input
-    push ebx
+    push eax
     call print
 
     mov eax, '*'
