@@ -10,8 +10,6 @@ section .data
     banner_str:     db 'uforth v0.0.6', NEWLINE, 0
     ok_str:         db 'ok ', 0
     error_str:      db 'error ', 0
-    test1:          db 'test1', 0
-    test2:          db 'test0', 0
 
 %define STACK_SIZE 1024
 %define INPUT_BUFSIZE 1024
@@ -459,8 +457,8 @@ error:
     ret
 
 test:
-    mov  eax, test1
-    mov  ebx, test2
+    mov  eax, banner_str
+    mov  ebx, ok_str
     call _strcmp
 
     ret
