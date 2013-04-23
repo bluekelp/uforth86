@@ -7,7 +7,7 @@
 %define ENTER   NEWLINE
 
 section .data
-    banner_str:     db 'uforth v0.0.6', NEWLINE, 0
+    banner_str:     db 'uforth v0.0.6', 0
     ok_str:         db 'ok ', 0
     error_str:      db 'error ', 0
 
@@ -61,6 +61,12 @@ section .text
 
 %macro @NUMBER 0
     call _number_asm
+%endmacro
+
+%macro putc 1
+    mov  eax, %1
+    @PUSH_EAX
+    @EMIT
 %endmacro
 
 ; -----------------------------
@@ -194,7 +200,7 @@ dd TICKS                    ; link pointer
 dd _depth_asm               ; code pointer
                             ; param field empty - primitive assembly
 _depth_asm:
-    call stack_depth
+    call forth_stack_depth
     @PUSH_EAX
     ret
 
@@ -217,6 +223,7 @@ _puts:
     mov  eax, 4             ; sys_write
     mov  ebx, 1             ; fd 1 = stdout
     int  80h
+    putc(NEWLINE)
     ret
 
 ; string pointer in <eax>, return string length in <eax>
@@ -421,19 +428,8 @@ init:
     mov  [input_p], DWORD input
     ret
 
-; ( -- x1 x2 xN pushes <ecx> values of <eax> onto the Forth data stack )
-_pushN:
-.pushnloop:
-    cmp  ecx, 0
-    je   .pushnexit
-    @PUSH_EAX
-    dec  ecx
-    jmp  .pushnloop
-.pushnexit:
-    ret
-
-; ( -- , returns the depth of the stack in <eax> )
-stack_depth:
+; ( -- , returns the depth of the Forth stack in <eax> )
+forth_stack_depth:
     ; dsentinal - 4 bytes = top
     mov  eax, dsentinel
     mov  ebx, [dsp]
@@ -441,7 +437,7 @@ stack_depth:
     shr  eax, 2             ; divide by 4 to return #cells difference, not bytes
     ret
 
-print_banner:
+banner:
     mov  eax, banner_str
     call _puts
     ret
@@ -457,10 +453,24 @@ error:
     ret
 
 test:
-    mov  eax, banner_str
-    mov  ebx, ok_str
-    call _strcmp
+    call _gets              ; leaves string in [input]
+    mov  eax, input
+    call _strlen
+    mov  eax, input
+.testloop:
+    call _strtok
+    push eax                ; token size
 
+    mov  eax, input
+    call _puts              ; show token (proof it terminates string after token)
+
+    pop  ecx                ; token size
+    mov  eax, input
+    add  eax, ecx           ; eax = input + token = start of next token?
+    inc  eax                ; get past null
+    call _puts              ; show rest of input
+
+    mov  eax, 0
     ret
 
 ; -----------------------------
@@ -472,7 +482,7 @@ test:
 _start:
 _uforth:
     call init
-    call print_banner
+    call banner
     call test
     mov  ebx, eax           ; return value of test is our exit code
     mov  eax, 1             ; sys_exit
