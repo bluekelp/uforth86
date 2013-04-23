@@ -83,7 +83,7 @@ section .text
 ; ( -- n, pushes <eax> into the stack as a cell )
 PUSH_EAX:
 db 8,'push_eax'             ; #byte in name, name
-dd 0                        ; link pointer
+dd POP_EAX                  ; link pointer
 dd _push_asm                ; code pointer
                             ; param field empty - primitive assembly
 _push_asm:
@@ -97,7 +97,7 @@ _push_asm:
 ; ( n -- , pop a cell off stack, leaves it in <eax> )
 POP_EAX:
 db 7,'pop_eax'              ; #byte in name, name
-dd PUSH_EAX                 ; link pointer
+dd EMIT                     ; link pointer
 dd _pop_asm                 ; code pointer
                             ; param field empty - primitive assembly
 _pop_asm:
@@ -111,7 +111,7 @@ _pop_asm:
 ; ( c -- , pops a cell and prints its first byte to stdout )
 EMIT:
 db 4,'emit'                 ; #byte in name, name
-dd POP_EAX                  ; link pointer
+dd NUMBER                   ; link pointer
 dd _emit_asm                ; code pointer
                             ; param field empty - primitive assembly
 _emit_asm:
@@ -132,7 +132,7 @@ _emit_asm:
 ; <n> will by 10x too large if we encounter an ASCII char outside '0'..'9' but otherwise ok
 NUMBER:
 db 6,'number'               ; #byte in name, name
-dd EMIT                     ; link pointer
+dd TOKEN                    ; link pointer
 dd _number_asm              ; code pointer
                             ; param field empty - primitive assembly
 _number_asm:
@@ -169,7 +169,7 @@ _number_asm:
 ; <eax> returned is also token length
 TOKEN:
 db 5,'token'                ; #byte in name, name
-dd NUMBER                   ; link pointer
+dd S0                       ; link pointer
 dd _token_asm               ; code pointer
                             ; param field empty - primitive assembly
 _token_asm:
@@ -180,7 +180,7 @@ _token_asm:
 
 S0:
 db 2,'s0'                   ; #byte in name, name
-dd TOKEN                    ; link pointer
+dd TICKS                    ; link pointer
 dd _S0_asm                  ; code pointer
                             ; param field empty - primitive assembly
 _S0_asm:
@@ -190,7 +190,7 @@ _S0_asm:
 
 TICKS:
 db 2,"'s"                   ; #byte in name, name
-dd S0                       ; link pointer
+dd DEPTH                    ; link pointer
 dd _tickS_asm               ; code pointer
                             ; param field empty - primitive assembly
 _tickS_asm:
@@ -200,7 +200,7 @@ _tickS_asm:
 
 DEPTH:
 db 5,"depth"                ; #byte in name, name
-dd TICKS                    ; link pointer
+dd 0                        ; link pointer
 dd _depth_asm               ; code pointer
                             ; param field empty - primitive assembly
 _depth_asm:
@@ -490,6 +490,26 @@ _exit:
     mov  eax, 1             ; sys_exit
     int  80h
 
+find:
+    mov  eax, 0
+    ret
+
+; execute a word
+; eax holds pointer to string of word (name) to execute
+execute:
+    push eax
+    call find
+    cmp  eax, 0
+    je   .executenotfound
+    ; else found
+    pop  eax
+    ret
+.executenotfound:
+    pop  eax
+    call _puts
+    ret
+
+; handle input/words typed from stdin
 words:
     call _gets              ; leaves string in [input]
     mov  eax, input
