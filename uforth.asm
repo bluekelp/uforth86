@@ -8,13 +8,10 @@
 
 section .data
     banner_str:     db 'uforth v0.0.6', NEWLINE, 0
-    banner_len:     equ $-banner_str
-
     ok_str:         db 'ok ', 0
-    ok_len:         equ $-ok_str
-
     error_str:      db 'error ', 0
-    error_len:      equ $-error_str
+    test1:          db 'test1', 0
+    test2:          db 'test0', 0
 
 %define STACK_SIZE 1024
 %define INPUT_BUFSIZE 1024
@@ -142,9 +139,9 @@ _number_asm:
     mov  ebx, 0
     mov  bl, [edx]          ; bl = (char)*p
     cmp  ebx, '0'
-    jl   .badchar
+    jb   .badchar
     cmp  ebx, '9'
-    jg   .badchar
+    ja   .badchar
     sub  ebx, '0'           ; difference is decimal 0..9
     add  eax, ebx
     cmp  ecx, 1
@@ -263,7 +260,7 @@ _strtok:
     sub  eax, ebx           ; length
     ret
 
-; copies string <ebx> into string <eax>
+; copies string <ebx> into string <eax> (like strcpy(eax, ebx))
 _strcpy:
 .strcpyloop:
     mov  ecx, 0
@@ -275,7 +272,58 @@ _strcpy:
     jne  .strcpyloop
     ret
 
+; compares <eax> to <ebx>;  returns -1 if string eax < ebx, 0 if same, 1 if ebx > eax
+; eax and ebx must not be same
+_strcmp:
+    mov  ecx, 0
+    call _strcmpx
+    ret
+
 ; _strcmpi ; uppercase chars are 20h lower than lower case in ASCII
+; works only with strings that are letters (others will be thrown off by the ORing strcmpx() does
+;  and results are undefined)
+; eax and ebx must not be same
+_strcmpi:
+    mov  ecx, 20h
+    call _strcmpx
+    ret
+
+; compares <eax> to <ebx>;  returns -1 if string eax < ebx, 0 if same, 1 if ebx > eax
+; ORs each byte of each string by <ecx> when comparing
+; eax and ebx must not be same
+_strcmpx:
+.strcmpxloop:
+    mov  dl, [eax]
+    mov  dh, [ebx]
+    inc  eax
+    inc  ebx
+    cmp  dl, 0
+    je   .strcmpxadone
+    cmp  dl, 0
+    je   .strcmpxbdone
+    or   dl, cl
+    or   dh, cl
+    cmp  dl, dh
+    jb   .strcmpxaless
+    ja   .strcmpxbless
+    jmp  .strcmpxloop
+
+.strcmpxadone:
+    cmp  dh, 0
+    je   .strcmpxsame
+.strcmpxaless:
+    mov  eax, -1
+    ret
+.strcmpxbdone:
+    cmp  dl, 0
+    je   .strcmpxsame
+.strcmpxbless:
+    mov  eax, 1
+    ret
+.strcmpxsame:
+    mov  eax, 0
+    ret
+
 
 ; -----------------------------
 ; 
@@ -411,31 +459,9 @@ error:
     ret
 
 test:
-    call _gets
-    mov  eax, [input_p]
-    sub  eax, input         ; length of input in eax
-
-    call _itoa              ; puts result in scratch
-
-    mov  eax, scratch
-    call _puts
-
-    mov  eax, NEWLINE
-    @PUSH_EAX
-    @EMIT
-
-    mov  eax, input
-    call _strtok
-
-    mov  eax, input
-    call _puts              ; output first token
-
-    mov  ebx, input
-    mov  eax, scratch
-    call _strcpy            ; copy <ebx> into <eax> (input into scratch)
-
-    mov  eax, scratch
-    call _strlen            ; <eax> left as strlen of <error>
+    mov  eax, test1
+    mov  ebx, test2
+    call _strcmp
 
     ret
 
