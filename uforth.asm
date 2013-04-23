@@ -291,7 +291,7 @@ _strrev:
     cmp  eax, ebx
     jae  .strrevexit        ; exit w/o reversing if start >= stop (check b/c of the strlen()-1 above on 1 byte strings, etc.)
     call reverse_bytes
-.strrevexit
+.strrevexit:
     ret
 
 ; compares <eax> to <ebx>;  returns -1 if string eax < ebx, 0 if same, 1 if ebx > eax
@@ -488,13 +488,13 @@ _exit:
     mov  eax, 1             ; sys_exit
     int  80h
 
-test:
+words:
     call _gets              ; leaves string in [input]
     mov  eax, input
     mov  [miscp], eax       ; token walker
-.testloop:
+.wordsloop:
     cmp  [eof], BYTE 0
-    ja   .testloopexit
+    ja   .wordsloopexit
     call _strtok
     push eax                ; token size
 
@@ -508,14 +508,14 @@ test:
     mov  [miscp], eax
     mov  ebx, [input_p]
     cmp  eax, ebx
-    jae  .testloopnext      ; past last token
-    jmp  .testloop
+    jae  .wordsloopnext     ; at/past last token
+    jmp  .wordsloop
 
-.testloopnext:
+.wordsloopnext:
     mov  eax, input
     mov  [input_p], eax     ; reset input buffer and walker
-    jmp  test               ; repeat
-.testloopexit:
+    jmp  words              ; repeat
+.wordsloopexit:
     mov  eax, 0
     ret
 
@@ -529,5 +529,5 @@ _start:
 _uforth:
     call init
     call banner
-    call test
+    call words
     call _exit              ; use whatever is in eax currently
