@@ -7,13 +7,13 @@
 %define ENTER   NEWLINE
 
 section .data
-    banner:         db 'uforth v0.0.6', NL
-    banner_len:     equ $-banner
+    banner_str:     db 'uforth v0.0.6', NEWLINE, 0
+    banner_len:     equ $-banner_str
 
-    ok_str:         db 'ok', NL
+    ok_str:         db 'ok ', 0
     ok_len:         equ $-ok_str
 
-    error_str:      db 'error', NL
+    error_str:      db 'error ', 0
     error_len:      equ $-error_str
 
 %define STACK_SIZE 1024
@@ -229,6 +229,39 @@ H:
 
 ; -----------------------------
 ; 
+; c string functions
+; 
+; -----------------------------
+
+; prints the c string pointed to by <eax> to stdout, followed by NEWLINE
+; returns: void - <eax> undefined
+_puts:
+    push eax                ; save string base for later math
+    call _strlen            ; length now in eax
+    mov  edx, eax           ; edx = length
+    pop  ecx                ; base string location (for len math)
+    mov  eax, 4             ; sys_write
+    mov  ebx, 1             ; fd 1 = stdout
+    int  80h
+    ret
+
+; string pointer in <eax>, return string length in <eax>
+_strlen:
+    push eax
+.strlenloop:
+    cmp  [eax], byte 0
+    je   .strlenexit
+    inc  eax
+    jmp  .strlenloop
+.strlenexit:
+    pop  ebx
+    sub  eax, ebx           ; <eax> now has strlen (current-original)
+    ret
+
+; _strcmpi ; uppercase chars are 20h lower than lower case in ASCII
+
+; -----------------------------
+; 
 ; support functions
 ; 
 ; -----------------------------
@@ -346,59 +379,44 @@ stack_depth:
     shr  eax, 2             ; divide by 4 to return #cells difference, not bytes
     ret
 
-; x86 stack: ( s l -- , prints <l> bytes of the string pointed to by <s> to stdout )
-print:
-    pop  eax                ; return location
-    pop  edx                ; lengh
-    pop  ecx                ; string location
-    push eax                ; return location
-    mov  eax, 4             ; sys_write
-    mov  ebx, 1             ; fd 1 = stdout
-    int  80h
-    ret
-
 print_banner:
-    push banner
-    push banner_len
-    call print
+    mov  eax, banner_str
+    call _puts
     ret
 
 ok:
-    push ok_str
-    push ok_len
-    call print
+    mov  eax, ok_str
+    call _puts
     ret
 
 error:
-    push error_str
-    push error_len
-    call print
+    mov  eax, error_str
+    call _puts
     ret
 
 test:
     call read_line
     mov  eax, [input_p]
     sub  eax, input         ; length of input in eax
-    push eax                ; popped (below) for exit code
 
     call itoa               ; puts result in scratch
 
-    push scratch
-    push eax                ; length of scratch (left from itoa() call)
-    call print
+    mov  eax, scratch
+    call _puts
 
     mov  eax, NEWLINE
     @PUSH_EAX
     @EMIT
 
-    pop  eax                ; length of input buffer (including newline, if present)
-    push input
-    push eax
-    call print
+    mov eax, input
+    call _puts
 
     mov  eax, '*'
     @PUSH_EAX
     @EMIT
+
+    mov  eax, input
+    call _strlen            ; <eax> left as strlen of <error>
 
     ret
 
