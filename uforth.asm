@@ -413,12 +413,11 @@ test:
     @PUSH_EAX
     @EMIT
 
-    mov eax, input
-    call _puts
+    mov  eax, input
+    call _strtok
 
-    mov  eax, '*'
-    @PUSH_EAX
-    @EMIT
+    mov eax, input
+    call _puts              ; output first token
 
     mov  eax, input
     call _strlen            ; <eax> left as strlen of <error>
