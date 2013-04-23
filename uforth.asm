@@ -313,18 +313,18 @@ reverse_bytes:
 ; waits for a char from stdin and stores in current location of [input_p].
 ; increments <input_p> one byte when complete
 ; return 0 on error/EOF or ASCII value of char read otherwise
-read_char:
+_getc:
     mov  ecx, [input_p]     ; where to read
     mov  edx, 1             ; # bytes to read
     mov  eax, 3             ; sys_read
     mov  ebx, 0             ; fd 0 = stdin
     int  80h
     cmp  eax, 1             ; # bytes read
-    je   .readcharok
-.readerr:
+    je   .getcok
+.getcerr:
     mov  eax, 0
     ret
-.readcharok:
+.getcok:
     mov  eax, [input_p]
     mov  al,  [eax]
     add  [input_p], DWORD 1 ; increment by a byte, not an int
@@ -334,20 +334,19 @@ read_char:
 ; data are left in <input> buffer, location in buffer is dependent on
 ; value of <input_p> when this fx is called
 ; no return value
-read_string:
-read_line:
-.readlineloop:
+_gets:
+.getsloop:
     mov eax, 0
-    call read_char
-    cmp  eax, 0             ; error
-    je   .readlineerr
+    call _getc
+    cmp  eax, 0             ; error or EOF
+    je   .getserr
     cmp  al, ENTER
-    je   .readlineok
-    jmp  .readlineloop
-.readlineerr:
+    je   .getsok
+    jmp  .getsloop
+.getserr:
     call error
     ret
-.readlineok:
+.getsok:
     call ok
     ret
 
@@ -395,7 +394,7 @@ error:
     ret
 
 test:
-    call read_line
+    call _gets
     mov  eax, [input_p]
     sub  eax, input         ; length of input in eax
 
