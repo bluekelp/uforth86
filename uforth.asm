@@ -160,37 +160,16 @@ _number_asm:
     ret
 
 
-; x86 stack: ( s l -- )
-; ( -- n , parses a string and pushes the number of bytes in the next token )
+; parses a string (<eax>) and pushes the number of bytes in the first token onto the Forth stack
+; <eax> returned is also token length
 TOKEN:
 db 5,'token'                ; #byte in name, name
 dd NUMBER                   ; link pointer
 dd _token_asm               ; code pointer
                             ; param field empty - primitive assembly
 _token_asm:
-    ; TODO cleanup registers/use
-    pop  eax
-    pop  ecx
-    pop  ebx
-    push eax
-    mov  edx, 0
-.tokenloop:
-    cmp  ecx, 0
-    je   .tokenexit
-    ; read byte and check if space/tab
-    mov  eax, 0
-    mov  al, [ebx]
-    cmp  al, SPACE
-    je   .tokenexit
-    cmp  al, TAB
-    je   .tokenexit
-    ; prep for next char (if any)
-    inc  ebx
-    inc  edx
-    dec  ecx
-    jmp  .tokenloop
-.tokenexit:
-    mov  eax, edx
+    pop  ebx                ; return value
+    call _strtok
     @PUSH_EAX
     ret
 
@@ -258,6 +237,33 @@ _strlen:
     sub  eax, ebx           ; <eax> now has strlen (current-original)
     ret
 
+; parse string pointed to by <eax> and return # chars in its first token in <eax>
+; writes a null in the string at the boundary of the token (the terminating space/tab)
+_strtok:
+    push eax                ; original pointer
+    mov  ebx, eax
+.strtokloop:
+    ; read byte and check if space/tab
+    mov  eax, 0
+    mov  al, [ebx]
+    ; compare to terminators
+    cmp  al, 0
+    je   .strtokexit
+    cmp  al, SPACE
+    je   .strtokexit
+    cmp  al, TAB
+    je   .strtokexit
+    ; prep for next char (if any)
+    inc  ebx
+    jmp  .strtokloop
+.strtokexit:
+    mov  [ebx], BYTE 0      ; overwrite SPACE/TAB with null
+    mov  eax, ebx
+    pop  ebx                ; original pointer
+    sub  eax, ebx           ; length
+    ret
+
+
 ; _strcmpi ; uppercase chars are 20h lower than lower case in ASCII
 
 ; -----------------------------
@@ -267,12 +273,12 @@ _strlen:
 ; -----------------------------
 
 ; writes eax as unsigned decimal string to <scratch> and return length in eax
-itoa:
+_itoa:
     ; eax = number to convert
     mov  [scratchp], DWORD scratch    ; scratchp = &scratch
     mov  ecx, [scratchp]    ; ecx = scratchp
     mov  ebx, 10            ; radix
-.itoaloop:
+._itoaloop:
     mov  edx, 0             ; upper portion of number to divide - set to 0 to just use eax
     idiv ebx                ; divides eax by ebx
     ; edx=remainder eax=quotient
@@ -280,8 +286,8 @@ itoa:
     mov  [ecx], dl          ; (char*)*scratchp = (byte)edx
     inc  ecx
     cmp  eax, 0
-    jne  .itoaloop          ; next char if more (if eax > ebx (radix))
-.itoaexit:
+    jne  ._itoaloop          ; next char if more (if eax > ebx (radix))
+._itoaexit:
     mov  [scratchp], ecx    ; scratchp = ecx (stores all increments)
     ; reverse bytes in scratch
     mov  eax, ecx           ; eax = ecx = scratchp
@@ -398,7 +404,7 @@ test:
     mov  eax, [input_p]
     sub  eax, input         ; length of input in eax
 
-    call itoa               ; puts result in scratch
+    call _itoa              ; puts result in scratch
 
     mov  eax, scratch
     call _puts
