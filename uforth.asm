@@ -6,13 +6,15 @@
 %define NL      NEWLINE
 %define ENTER   NEWLINE
 
-section .data
-    banner_str:     db 'uforth v0.0.6', 0
-    ok_str:         db 'ok ', 0
-    error_str:      db 'error ', 0
+%define cstr(x) db x, 0
 
-%define STACK_SIZE 1024
-%define INPUT_BUFSIZE 1024
+section .data
+    banner_str: cstr('uforth v0.0.6')
+    ok_str:     cstr('ok ')
+    error_str:  cstr('error ')
+
+%define STACK_SIZE      128
+%define INPUT_BUFSIZE   128
 %define SCRATCH_BUFSIZE 128
 
 section .bss
@@ -22,9 +24,9 @@ section .bss
     h:              resd 1                  ; H - end of dictionary
     input:          resb INPUT_BUFSIZE
     input_p:        resd 1                  ; pointer to current location in input
+    tokenp:         resd 1                  ; misc pointer to use
     scratch:        resb SCRATCH_BUFSIZE    ; tmp buffer to use
     scratchp:       resd 1                  ; tmp int to use
-    miscp:          resd 1                  ; misc pointer to use
     eof:            resb 1                  ; set to true when EOF detected
 
 section .text
@@ -491,21 +493,21 @@ _exit:
 words:
     call _gets              ; leaves string in [input]
     mov  eax, input
-    mov  [miscp], eax       ; token walker
+    mov  [tokenp], eax      ; token walker (TODO move pointer to be local to this function)
 .wordsloop:
     cmp  [eof], BYTE 0
     ja   .wordsloopexit
     call _strtok
     push eax                ; token size
 
-    mov  eax, [miscp]
-    call _puts              ; show token (proof it terminates string after token)
+    mov  eax, [tokenp]
+    call execute
 
     pop  ecx                ; token size
-    mov  eax, [miscp]
+    mov  eax, [tokenp]
     add  eax, ecx
     inc  eax
-    mov  [miscp], eax
+    mov  [tokenp], eax
     mov  ebx, [input_p]
     cmp  eax, ebx
     jae  .wordsloopnext     ; at/past last token
