@@ -263,6 +263,17 @@ _strtok:
     sub  eax, ebx           ; length
     ret
 
+; copies string <ebx> into string <eax>
+_strcpy:
+.strcpyloop:
+    mov  ecx, 0
+    mov  cl, [ebx]
+    mov  [eax], cl
+    inc  eax
+    inc  ebx
+    cmp  cl, 0              ; compare after copy to ensure null terminated
+    jne  .strcpyloop
+    ret
 
 ; _strcmpi ; uppercase chars are 20h lower than lower case in ASCII
 
@@ -416,10 +427,14 @@ test:
     mov  eax, input
     call _strtok
 
-    mov eax, input
+    mov  eax, input
     call _puts              ; output first token
 
-    mov  eax, input
+    mov  ebx, input
+    mov  eax, scratch
+    call _strcpy            ; copy <ebx> into <eax> (input into scratch)
+
+    mov  eax, scratch
     call _strlen            ; <eax> left as strlen of <error>
 
     ret
