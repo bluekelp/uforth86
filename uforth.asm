@@ -24,6 +24,8 @@ section .bss
     input_p:        resd 1                  ; pointer to current location in input
     scratch:        resb SCRATCH_BUFSIZE    ; tmp buffer to use
     scratchp:       resd 1                  ; tmp int to use
+    miscp:          resd 1                  ; misc pointer to use
+    eof:            resb 1                  ; set to true when EOF detected
 
 section .text
     global _start
@@ -208,9 +210,9 @@ H:
     dd 0,0,0,0              ; some nulls
 
 ; -----------------------------
-; 
+;
 ; c string functions
-; 
+;
 ; -----------------------------
 
 ; prints the c string pointed to by <eax> to stdout, followed by NEWLINE
@@ -331,9 +333,9 @@ _strcmpx:
 
 
 ; -----------------------------
-; 
+;
 ; support functions
-; 
+;
 ; -----------------------------
 
 ; writes eax as unsigned decimal string to <scratch> and return length in eax
@@ -389,15 +391,19 @@ _getc:
     mov  eax, 3             ; sys_read
     mov  ebx, 0             ; fd 0 = stdin
     int  80h
-    cmp  eax, 1             ; # bytes read
-    je   .getcok
+    cmp  eax, 0             ; # bytes read
+    ja   .getcok
+    je   .geteof
 .getcerr:
+    mov  eax, -1
+    ret
+.geteof:
     mov  eax, 0
     ret
 .getcok:
     mov  eax, [input_p]
     mov  al,  [eax]
-    add  [input_p], DWORD 1 ; increment by a byte, not an int
+    add  [input_p], DWORD 1 ; increment by a byte (1), not an int (4)
     ret
 
 ; read a line of input (until either ENTER inputed or EOF/error)
@@ -408,14 +414,22 @@ _gets:
 .getsloop:
     mov eax, 0
     call _getc
-    cmp  eax, 0             ; error or EOF
-    je   .getserr
     cmp  al, ENTER
-    je   .getsok
+    je   .getsenter
+    cmp  eax, 0             ; EOF
+    je   .getseof
+    jl   .getserr           ; other error
     jmp  .getsloop
+.getseof:
+    mov [eof], BYTE 1
+    jmp .getsok
 .getserr:
     call error
     ret
+.getsenter:
+    mov  eax, [input_p]
+    dec  eax                ; backup to NEWLINE
+    mov  [eax], BYTE 0      ; make sure null terminated instead of NEWLINE
 .getsok:
     call ok
     ret
@@ -452,31 +466,47 @@ error:
     call _puts
     ret
 
+; exits app with return code of eax (lower byte)
+_exit:
+    mov  ebx, eax
+    mov  eax, 1             ; sys_exit
+    int  80h
+
 test:
     call _gets              ; leaves string in [input]
     mov  eax, input
-    call _strlen
-    mov  eax, input
+    mov  [miscp], eax       ; token walker
 .testloop:
+    cmp  [eof], BYTE 0
+    ja   .textloopexit
     call _strtok
     push eax                ; token size
 
-    mov  eax, input
+    mov  eax, [miscp]
     call _puts              ; show token (proof it terminates string after token)
 
     pop  ecx                ; token size
-    mov  eax, input
-    add  eax, ecx           ; eax = input + token = start of next token?
-    inc  eax                ; get past null
-    call _puts              ; show rest of input
+    mov  eax, [miscp]
+    add  eax, ecx
+    inc  eax
+    mov  [miscp], eax
+    mov  ebx, [input_p]
+    cmp  eax, ebx
+    jae  .testloopnext      ; past last token
+    jmp  .testloop
 
+.testloopnext:
+    mov  eax, input
+    mov  [input_p], eax     ; reset input buffer and walker
+    jmp  test               ; repeat
+.testloopexit:
     mov  eax, 0
     ret
 
 ; -----------------------------
-; 
+;
 ; entry
-; 
+;
 ; -----------------------------
 
 _start:
@@ -484,6 +514,4 @@ _uforth:
     call init
     call banner
     call test
-    mov  ebx, eax           ; return value of test is our exit code
-    mov  eax, 1             ; sys_exit
-    int  80h
+    call _exit              ; use whatever is in eax currently
