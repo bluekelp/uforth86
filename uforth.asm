@@ -279,6 +279,21 @@ _strcpy:
     jne  .strcpyloop
     ret
 
+; reverse chars in the string <eax>
+_strrev:
+    push eax
+    push eax
+    call _strlen
+    pop  ebx
+    add  ebx, eax
+    dec  ebx                ; string + strlen() - 1  // -1 is b/c reverse_bytes's 2nd pointer is inclusive
+    pop  eax                ; string
+    cmp  eax, ebx
+    jae  .strrevexit        ; exit w/o reversing if start >= stop (check b/c of the strlen()-1 above on 1 byte strings, etc.)
+    call reverse_bytes
+.strrevexit
+    ret
+
 ; compares <eax> to <ebx>;  returns -1 if string eax < ebx, 0 if same, 1 if ebx > eax
 ; eax and ebx must not be same
 _strcmp:
@@ -359,25 +374,25 @@ _itoa:
     mov  eax, ecx           ; eax = ecx = scratchp
     sub  eax, scratch       ; length of string in scratch
     push eax                ; length of scratch string
-    mov  ebx, scratch       ; addr of first char
-    mov  ecx, [scratchp]
-    dec  ecx                ; addr of last char
+    mov  eax, scratch       ; addr of first char
+    mov  ebx, [scratchp]
+    dec  ebx                ; addr of last char
     call reverse_bytes
     pop  eax                ; length of string
     ret
 
-; ebx - pointer to start of buffer
-; ecx - pointer to   end of buffer (inclusive)
+; eax - pointer to start of buffer
+; ebx - pointer to   end of buffer (inclusive)
 reverse_bytes:
 .reverseloop:
-    cmp  ebx, ecx           ; src <= dest?
+    cmp  eax, ebx           ; src <= dest?
     jae  .reverseexit       ; jae = unsigned, jge = signed
-    mov  al, [ebx]          ; al = *src
-    mov  dl, [ecx]          ; dl = *dest
-    mov  [ebx], dl          ; *src = dl
-    mov  [ecx], al          ; *dest = al
-    inc  ebx                ; src++
-    dec  ecx                ; dest--
+    mov  cl, [eax]          ; cl = *src
+    mov  ch, [ebx]          ; ch = *dest
+    mov  [eax], ch          ; *src = ch
+    mov  [ebx], cl          ; *dest = cl
+    inc  eax                ; src++
+    dec  ebx                ; dest--
     jmp  .reverseloop
 .reverseexit:
     ret
@@ -440,6 +455,7 @@ init:
     mov  [dsp], DWORD dsentinel          ; compute top of stack/S0
     mov  [h], DWORD H                    ; set H
     mov  [input_p], DWORD input
+    mov  [eof], BYTE 0
     ret
 
 ; ( -- , returns the depth of the Forth stack in <eax> )
@@ -478,7 +494,7 @@ test:
     mov  [miscp], eax       ; token walker
 .testloop:
     cmp  [eof], BYTE 0
-    ja   .textloopexit
+    ja   .testloopexit
     call _strtok
     push eax                ; token size
 
