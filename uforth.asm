@@ -14,6 +14,7 @@ section .data
     error_str:  cstr('error ')
     word_not_found_str: cstr('word not found: ')
     null_str:   cstr('')
+    test_str:   cstr('test')
 
 %define STACK_SIZE      128
 %define INPUT_BUFSIZE   128
@@ -524,21 +525,19 @@ _exit:
     mov  eax, 1             ; sys_exit
     int  80h
 
+; return 0 if string <eax> found in dictionary
 find:
-    mov  eax, 0
+    mov  ebx, test_str
+    call _strcmpi
     ret
 
 ; execute a word
 ; eax holds pointer to string of word (name) to execute
 execute:
     push eax
-    mov  ebx, null_str
-    call _strcmp
-    cmp  eax, 0
-    jz   .executeexit       ; don't exit empty words, just return ok
     call find
     cmp  eax, 0
-    je   .executenotfound
+    jne  .executenotfound
     ; else found - execute word
 .executeexit:
     pop  eax
