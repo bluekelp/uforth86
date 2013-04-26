@@ -320,21 +320,35 @@ _strrev:
 .strrevexit:
     ret
 
+; compares <eax> to <ebx>;  returns -1 if string eax < ebx, 0 if same, 1 if ebx > eax
+; eax and ebx must not be same
+_strcmp:
+    mov  ecx, 0
+    call _strcmpx
+    ret
+
 ; _strcmpi ; uppercase chars are 20h lower than lower case in ASCII
-; works only with strings that are letters (others will be thrown off by the ORing strcmpx() does
-;  and results are undefined)
 ; eax and ebx must not be same
 _strcmpi:
-.strcmpiloop:
+    mov  ecx, 1
+    call _strcmpx
+    ret
+
+; compares <eax> to <ebx>;  returns -1 if string eax < ebx, 0 if same, 1 if ebx > eax
+; eax and ebx must not be same
+_strcmpx:
+.strcmpxloop:
     mov  dl, [eax]
     mov  dh, [ebx]
     inc  eax
     inc  ebx
     cmp  dl, 0
-    je   .strcmpiadone
+    je   .strcmpxadone
     cmp  dl, 0
-    je   .strcmpibdone
-    cmp  dl, 41h            ; convert to lowercase, if necessary
+    je   .strcmpxbdone
+    cmp  ecx, 0             ; check if case insensitive compare
+    jz   .strcmpxcompare
+    cmp  dl, 41h            ; convert to lowercase, as necessary
     jb   .firstdone
     cmp  dl, 5ah
     ja   .firstdone
@@ -346,58 +360,25 @@ _strcmpi:
     ja   .seconddone
     or   dh, 20h
 .seconddone:
+.strcmpxcompare:
     cmp  dl, dh             ; <--- compare
-    jb   .strcmpialess
-    ja   .strcmpibless
-    jmp  .strcmpiloop
+    jb   .strcmpxaless
+    ja   .strcmpxbless
+    jmp  .strcmpxloop
 
-.strcmpiadone:
+.strcmpxadone:
     cmp  dh, 0
-    je   .strcmpisame
-.strcmpialess:
+    je   .strcmpxsame
+.strcmpxaless:
     mov  eax, -1
     ret
-.strcmpibdone:
+.strcmpxbdone:
     cmp  dl, 0
-    je   .strcmpisame
-.strcmpibless:
+    je   .strcmpxsame
+.strcmpxbless:
     mov  eax, 1
     ret
-.strcmpisame:
-    mov  eax, 0
-    ret
-
-
-; compares <eax> to <ebx>;  returns -1 if string eax < ebx, 0 if same, 1 if ebx > eax
-; eax and ebx must not be same
-_strcmp:
-.strcmploop:
-    mov  dl, [eax]
-    mov  dh, [ebx]
-    inc  eax
-    inc  ebx
-    cmp  dl, 0
-    je   .strcmpadone
-    cmp  dl, 0
-    je   .strcmpbdone
-    cmp  dl, dh
-    jb   .strcmpaless
-    ja   .strcmpbless
-    jmp  .strcmploop
-
-.strcmpadone:
-    cmp  dh, 0
-    je   .strcmpsame
-.strcmpaless:
-    mov  eax, -1
-    ret
-.strcmpbdone:
-    cmp  dl, 0
-    je   .strcmpsame
-.strcmpbless:
-    mov  eax, 1
-    ret
-.strcmpsame:
+.strcmpxsame:
     mov  eax, 0
     ret
 
