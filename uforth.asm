@@ -12,6 +12,8 @@ section .data
     banner_str: cstr('uforth v0.0.6')
     ok_str:     cstr('ok ')
     error_str:  cstr('error ')
+    word_not_found_str: cstr('word not found: ')
+    null_str:   cstr('')
 
 %define STACK_SIZE      128
 %define INPUT_BUFSIZE   128
@@ -65,6 +67,14 @@ section .text
 
 %macro @NUMBER 0
     call _number_asm
+%endmacro
+
+%macro @CR 0
+    push eax
+    mov  eax, NEWLINE
+    @PUSH_EAX
+    @EMIT
+    pop  eax
 %endmacro
 
 %macro putc 1
@@ -217,9 +227,9 @@ H:
 ;
 ; -----------------------------
 
-; prints the c string pointed to by <eax> to stdout, followed by NEWLINE
+; prints the c string pointed to by <eax> to stdout
 ; returns: void - <eax> undefined
-_puts:
+_putstr:
     push eax                ; save string base for later math
     call _strlen            ; length now in eax
     mov  edx, eax           ; edx = length
@@ -227,6 +237,12 @@ _puts:
     mov  eax, 4             ; sys_write
     mov  ebx, 1             ; fd 1 = stdout
     int  80h
+    ret
+
+; prints the c string pointed to by <eax> to stdout, followed by NEWLINE
+; returns: void - <eax> undefined
+_puts:
+    call _putstr
     putc(NEWLINE)
     ret
 
@@ -448,7 +464,6 @@ _gets:
     dec  eax                ; backup to NEWLINE
     mov  [eax], BYTE 0      ; make sure null terminated instead of NEWLINE
 .getsok:
-    call ok
     ret
 
 ; init globals
@@ -476,12 +491,12 @@ banner:
 
 ok:
     mov  eax, ok_str
-    call _puts
+    call _putstr
     ret
 
 error:
     mov  eax, error_str
-    call _puts
+    call _putstr
     ret
 
 ; exits app with return code of eax (lower byte)
@@ -498,46 +513,61 @@ find:
 ; eax holds pointer to string of word (name) to execute
 execute:
     push eax
+    mov  ebx, null_str
+    call _strcmp
+    cmp  eax, 0
+    jz   .executeexit       ; don't exit empty words, just return ok
     call find
     cmp  eax, 0
     je   .executenotfound
-    ; else found
+    ; else found - execute word
+.executeexit:
     pop  eax
+    mov  eax, 0
     ret
 .executenotfound:
+    mov  eax, word_not_found_str
+    call _putstr
     pop  eax
     call _puts
+    mov  eax, -1
     ret
 
-; handle input/words typed from stdin
-words:
+; Forth's quit - outer loop that calls INTERPRET
+quit:
+    mov  [input_p], DWORD input
     call _gets              ; leaves string in [input]
-    mov  eax, input
-    mov  [tokenp], eax      ; token walker (TODO move pointer to be local to this function)
-.wordsloop:
     cmp  [eof], BYTE 0
-    ja   .wordsloopexit
-    call _strtok
-    push eax                ; token size
+    jne  .quitexit
+    mov  eax, input
+    call interpret
+    call ok
+    @CR
+    jmp  quit
+.quitexit:
+    ret
 
+; handle input/words found in <eax> pointer
+interpret:
+    mov  [tokenp], eax      ; token walker (TODO move pointer to be local to this function)
+.interpretloop:
+    call _strtok
+
+    push eax                ; token size
     mov  eax, [tokenp]
     call execute
-
+    ; TODO honor return code
     pop  ecx                ; token size
+
     mov  eax, [tokenp]
     add  eax, ecx
     inc  eax
     mov  [tokenp], eax
     mov  ebx, [input_p]
     cmp  eax, ebx
-    jae  .wordsloopnext     ; at/past last token
-    jmp  .wordsloop
-
-.wordsloopnext:
-    mov  eax, input
-    mov  [input_p], eax     ; reset input buffer and walker
-    jmp  words              ; repeat
-.wordsloopexit:
+    jae  .interpretloopexit ; at/past last token
+    jmp  .interpretloop
+.interpretloopexit:
     mov  eax, 0
     ret
 
@@ -551,5 +581,5 @@ _start:
 _uforth:
     call init
     call banner
-    call words
+    call quit               ; main loop does not "quit" the app - is Forth's quit word
     call _exit              ; use whatever is in eax currently
