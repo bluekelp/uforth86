@@ -17,8 +17,8 @@ ifeq ($(UNAME_S), Darwin)
 	ASFLAGS += -f macho32
 	LDFLAGS += -arch i386
 else
-	ASFLAGS += -f i386
-	ARCH=elf32
+	ASFLAGS += -f elf32
+	LDFLAGS += -m elf_i386
 endif
 
 
