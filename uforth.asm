@@ -47,10 +47,6 @@ section .bss
 section .text
     global __ASM_MAIN
 
-%macro directcall 1
-    ; nothing
-%endmacro
-
 ;;
 
 %define __cdecl             ; used to annotate a route uses c calling convention
@@ -145,7 +141,6 @@ section .text
 PUSH_EAX:
 DICT_ENTRY 'push_eax', NULL, _push_asm
 _push_asm:
-    directcall 4
     mov  ebx, [dsp]         ; load pointer
     sub  ebx, 4             ; decrement (push)
     mov  [ebx], eax         ; store value
@@ -156,7 +151,6 @@ _push_asm:
 POP_EAX:
 DICT_ENTRY 'pop_eax', PUSH_EAX, _pop_asm
 _pop_asm:
-    directcall 4
     mov  ebx, [dsp]         ; load pointer
     mov  eax, [ebx] ; <---- ; fetch value
     add  ebx, 4             ; increment (pop)
@@ -169,7 +163,6 @@ DICT_ENTRY 'emit', POP_EAX, _emit_asm
 _emit_asm:
 %ifidn __OUTPUT_FORMAT__, macho32
     ; OSX
-    directcall 0
     @POP_EAX
     push eax
     mov  ecx, esp
@@ -185,7 +178,6 @@ _emit_asm:
     ret
 %else
     ; Linux
-    directcall 0
     @POP_EAX
     push eax
     mov  ecx, esp           ; ecx = ptr to str to write (need ptr so we use esp trick, not eax directly)
@@ -205,7 +197,6 @@ _emit_asm:
 NUMBER:
 DICT_ENTRY 'number', EMIT, _number_asm
 _number_asm:
-    directcall 0
     pop  eax
     pop  ecx                ; length
     pop  edx                ; string pointer
