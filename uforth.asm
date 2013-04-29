@@ -5,6 +5,7 @@
 %define NEWLINE 10
 %define NL      NEWLINE
 %define ENTER   NEWLINE
+%define NULL    0
 
 %define cstr(x) db x, 0
 
@@ -29,14 +30,13 @@ section .bss
     dstack:         resd STACK_SIZE         ; data-stack - no overflow detection
     dsentinel:      resd 1                  ; top of the stack - sentinel value to detect underflow
     dsp:            resd 1                  ; data-stack pointer (current stack head)
-    h:              resd 1                  ; H - end of dictionary
+    dict:           resd 1                  ; pointer to start of dictionary list (H)
     input:          resb INPUT_BUFSIZE
     input_p:        resd 1                  ; pointer to current location in input
     tokenp:         resd 1                  ; misc pointer to use
     scratch:        resb SCRATCH_BUFSIZE    ; tmp buffer to use
     scratchp:       resd 1                  ; tmp int to use
     eof:            resb 1                  ; set to true when EOF detected
-    dict:           resd 1                  ; pointer to start of dictionary list
 
 %ifidn __OUTPUT_FORMAT__, macho32
 %define __ASM_MAIN start
@@ -77,16 +77,16 @@ section .text
 
 ; -- macros to help access local vars and params
 ;    only full sized ints are supported
-%macro C_local 1            ; index-1 based local parameter (e.g., C_local(1) is our first local
-    ebp-(%1*4)
-%endmacro
 
-%macro C_param 1
-    ebp+(4+(%1*4))          ; index-1 based parameter to routine (e.g., C_param(1) = first param)
-                            ; C_param(0) is undefined
-%endmacro
+; index-1 based local parameter (e.g., C_local(1) is our first local
+%define C_local(x) [ebp-(x*4)]
+
+; index-1 based parameter to routine (e.g., C_param(1) = first param)
+; C_param(0) is undefined
+%define C_param(x)  [ebp+(4+(x*4))]
 
 ;;
+
 
 %macro @PUSH_EAX 0
     call _push_asm
@@ -127,13 +127,17 @@ section .text
 ;
 ; -----------------------------
 
+; DICT_ENTRY name_cstr, nextDictEntry, code_ptr
+%macro DICT_ENTRY 3
+    cstr(%1)                ; name (null terminated)
+    dd  %2                  ; next dict ptr
+    dd  %3                  ; code ptr
+    dd  0                   ; param ptr
+%endmacro
 
 ; ( -- n, pushes <eax> into the stack as a cell )
 PUSH_EAX:
-db 8,'push_eax'             ; #byte in name, name
-dd 0                        ; link pointer
-dd _push_asm                ; code pointer
-                            ; param field empty - primitive assembly
+DICT_ENTRY 'push_eax', NULL, _push_asm
 _push_asm:
     directcall 4
     mov  ebx, [dsp]         ; load pointer
@@ -144,10 +148,7 @@ _push_asm:
 
 ; ( n -- , pop a cell off stack, leaves it in <eax> )
 POP_EAX:
-db 7,'pop_eax'              ; #byte in name, name
-dd PUSH_EAX                 ; link pointer
-dd _pop_asm                 ; code pointer
-                            ; param field empty - primitive assembly
+DICT_ENTRY 'pop_eax', PUSH_EAX, _pop_asm
 _pop_asm:
     directcall 4
     mov  ebx, [dsp]         ; load pointer
@@ -158,10 +159,7 @@ _pop_asm:
 
 ; ( c -- , pops a cell and prints its first byte to stdout )
 EMIT:
-db 4,'emit'                 ; #byte in name, name
-dd POP_EAX                  ; link pointer
-dd _emit_asm                ; code pointer
-                            ; param field empty - primitive assembly
+DICT_ENTRY 'emit', POP_EAX, _emit_asm
 _emit_asm:
 %ifidn __OUTPUT_FORMAT__, macho32
     ; OSX
@@ -198,10 +196,7 @@ _emit_asm:
 ; undefined if <l> less than 1
 ; <n> will by 10x too large if we encounter an ASCII char outside '0'..'9' but otherwise ok
 NUMBER:
-db 6,'number'               ; #byte in name, name
-dd EMIT                     ; link pointer
-dd _number_asm              ; code pointer
-                            ; param field empty - primitive assembly
+DICT_ENTRY 'number', EMIT, _number_asm
 _number_asm:
     directcall 0
     pop  eax
@@ -235,10 +230,7 @@ _number_asm:
 ; parses a string (<eax>) and pushes the number of bytes in the first token onto the Forth stack
 ; <eax> returned is also token length
 TOKEN:
-db 5,'token'                ; #byte in name, name
-dd NUMBER                   ; link pointer
-dd _token_asm               ; code pointer
-                            ; param field empty - primitive assembly
+DICT_ENTRY 'token', NUMBER, _token_asm
 _token_asm:
     pop  ebx                ; return value
     call _strtok
@@ -246,40 +238,28 @@ _token_asm:
     ret
 
 S0:
-db 2,'s0'                   ; #byte in name, name
-dd TOKEN                    ; link pointer
-dd _S0_asm                  ; code pointer
-                            ; param field empty - primitive assembly
-_S0_asm:
+DICT_ENTRY 's0', TOKEN, _s0_asm
+_s0_asm:
     mov  eax, dsentinel
     @PUSH_EAX
     ret
 
 TICKS:
-db 2,"'s"                   ; #byte in name, name
-dd S0                       ; link pointer
-dd _tickS_asm               ; code pointer
-                            ; param field empty - primitive assembly
+DICT_ENTRY "'s", S0, _tickS_asm
 _tickS_asm:
     mov  eax, [dsp]
     @PUSH_EAX
     ret
 
 DEPTH:
-db 5,"depth"                ; #byte in name, name
-dd TICKS                    ; link pointer
-dd _depth_asm               ; code pointer
-                            ; param field empty - primitive assembly
+DICT_ENTRY 'depth', TICKS, _depth_asm
 _depth_asm:
     call forth_stack_depth
     @PUSH_EAX
     ret
 
 H:
-db 1,"h    "                ; #byte in name, name
-dd DEPTH                    ; link pointer
-dd _h_asm                   ; code pointer
-                            ; param field empty - primitive assembly
+DICT_ENTRY 'h', DEPTH, _h_asm
 _h_asm:
     mov eax, [dict]
     @PUSH_EAX
@@ -574,10 +554,9 @@ _gets:
 init:
     mov  [dsentinel], DWORD 0badd00dh   ; assign sentinel value to help to see if clobbered
     mov  [dsp], DWORD dsentinel         ; compute top of stack/S0
-    mov  [h], DWORD H                   ; set H
+    mov  [dict], DWORD H                ; start of our dictionary - the last primitive Forth word defined
     mov  [input_p], DWORD input
     mov  [eof], BYTE 0                  ; seen EOF on input?
-    mov  [dict], DWORD H                ; start of our dictionary - the last primitive Forth word defined
     ret
 
 ; ( -- , returns the depth of the Forth stack in <eax> )
@@ -610,11 +589,33 @@ _exit:
     mov  eax, 1             ; sys_exit
     int  80h
 
+next_ptr:
+    C_prologue(8)
+    mov  eax, C_param(1)    ; 1st param (dict ptr)
+    mov  C_local(1), eax    ; dict entry in local #1
+    call _strlen
+    mov  C_local(2), eax    ; strlen in local #2
+    mov  eax, C_local(1)    ; dict ptr
+    mov  ebx, C_local(2)    ; strlen of name
+    add  eax, ebx           ; add strlen of dict entry name
+    inc  eax                ; +1 to skip null byte
+    mov  eax, [eax]         ; value of next ptr into eax for return
+    C_epilogue
+    ret
+
 ; return 0 if string <eax> found in dictionary
 __cdecl_hybrid
 find:
-    C_prologue(8)
-    mov  ebx, test_str
+    C_prologue(12)
+    mov  C_local(1), eax    ; word string ptr
+    mov  ebx, [dict]
+    mov  C_local(2), ebx    ; first dict entry
+    push DWORD C_local(2)   ; param 1 - dict ptr
+    call next_ptr
+    add  esp, 4             ; 1 param
+    mov  C_local(3), eax    ; next dict entry ptr
+    mov  ebx, C_local(2)
+    mov  eax, C_local(1)    ; word string ptr
     call _strcmpi
     C_epilogue
     ret
@@ -622,7 +623,7 @@ find:
 ; execute a word
 ; eax holds pointer to string of word (name) to execute
 execute:
-    push eax
+    push eax                ; ptr to word name/str
     call find
     cmp  eax, 0
     jne  .executenotfound
@@ -634,7 +635,7 @@ execute:
 .executenotfound:
     mov  eax, word_not_found_str
     call _putstr
-    pop  eax
+    pop  eax                ; ptr to word name/str
     call _puts
     mov  eax, -1
     ret
