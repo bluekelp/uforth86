@@ -594,6 +594,8 @@ __cdecl
 next_ptr:
     C_prologue(8)
     mov  eax, C_param(1)    ; 1st param (dict ptr)
+    cmp  eax, 0
+    jz   .exit              ; return NULL if ptr is NULL
     mov  C_local(1), eax    ; dict entry in local #1
     call _strlen
     mov  C_local(2), eax    ; strlen in local #2
@@ -602,6 +604,7 @@ next_ptr:
     add  eax, ebx           ; add strlen of dict entry name
     inc  eax                ; +1 to skip null byte
     mov  eax, [eax]         ; value of next ptr into eax for return
+.exit:
     C_epilogue
     ret
 
