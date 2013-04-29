@@ -614,10 +614,10 @@ find:
     C_prologue(8)
     mov  C_local(1), eax    ; string ptr (word name) to find
     mov  ebx, [dict]
-    mov  C_local(2), ebx    ; first dict entry
+    mov  C_local(2), ebx    ; currnt dict entry
 .loop:
     mov  eax, C_local(1)    ; word string ptr
-    call _strcmpi
+    call _strcmpi           ; ebx = current word name
     cmp  eax, 0
     jz   .exit
 
@@ -641,7 +641,7 @@ execute:
     push eax                ; ptr to word name/str
     call find
     cmp  eax, 0
-    jne  .notfound
+    jz   .notfound
     ; else found - execute word
 .exit:
     pop  eax
