@@ -40,16 +40,42 @@ section .text
     ; nothing
 %endmacro
 
-%macro cprologue 1
+;;
+
+%define __cdecl             ; used to annotate a route uses c calling convention
+
+%define __cdecl_hybrid      ; used to annotate a route uses c calling convention - modified
+                            ; in that no params to routine are pushed on stack. parameters are
+                            ; expected in eax, ebx, ecx, and/or edx
+
+%macro C_prologue 1
     push ebp
     mov  ebp, esp
     sub  esp, %1
+    push edi
+    push esi
 %endmacro
 
-%macro creturn 0
+%macro C_epilogue 0
+    pop  esi
+    pop  edi
+    mov  esp, ebp
     pop  ebp
     ret
 %endmacro
+
+; -- macros to help access local vars and params
+;    only full sized ints are supported
+%macro C_local 1            ; index-1 based local parameter (e.g., C_local(1) is our first local
+    ebp-(%1*4)
+%endmacro
+
+%macro C_param 1
+    ebp+(4+(%1*4))          ; index-1 based parameter to routine (e.g., C_param(1) = first param)
+                            ; C_param(0) is undefined
+%endmacro
+
+;;
 
 %macro @PUSH_EAX 0
     call _push_asm
@@ -526,9 +552,12 @@ _exit:
     int  80h
 
 ; return 0 if string <eax> found in dictionary
+__cdecl_hybrid
 find:
+    C_prologue(8)
     mov  ebx, test_str
     call _strcmpi
+    C_epilogue
     ret
 
 ; execute a word
