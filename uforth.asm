@@ -15,6 +15,11 @@ section .data
     word_not_found_str: cstr('word not found: ')
     null_str:   cstr('')
     test_str:   cstr('test')
+%ifidn __OUTPUT_FORMAT__, macho32
+    eol_str:    db CR, NL, 0
+%else
+    eol_str:    db NL, 0
+%endif
 
 %define STACK_SIZE      128
 %define INPUT_BUFSIZE   128
@@ -33,8 +38,14 @@ section .bss
     eof:            resb 1                  ; set to true when EOF detected
     dict:           resd 1                  ; pointer to start of dictionary list
 
+%ifidn __OUTPUT_FORMAT__, macho32
+%define __ASM_MAIN start
+%else
+%define __ASM_MAIN _start
+%endif
+
 section .text
-    global _start
+    global __ASM_MAIN
 
 %macro directcall 1
     ; nothing
@@ -99,9 +110,8 @@ section .text
 
 %macro @CR 0
     push eax
-    mov  eax, NEWLINE
-    @PUSH_EAX
-    @EMIT
+    mov  eax, eol_str
+    call _putstr
     pop  eax
 %endmacro
 
@@ -153,6 +163,23 @@ dd POP_EAX                  ; link pointer
 dd _emit_asm                ; code pointer
                             ; param field empty - primitive assembly
 _emit_asm:
+%ifidn __OUTPUT_FORMAT__, macho32
+    ; OSX
+    directcall 0
+    @POP_EAX
+    push eax
+
+    push 1            ; length
+    push eax            ; str
+    push 1              ; fd
+    mov  eax, 4
+    sub  esp, 4         ; extra space
+    int  80h
+    add  esp, 16
+    pop  eax
+    ret
+%else
+    ; Linux
     directcall 0
     @POP_EAX
     push eax
@@ -163,6 +190,8 @@ _emit_asm:
     int  80h
     pop  eax
     ret
+%endif
+
 
 ; x86 stack: ( s l -- )
 ; ( -- n , parses a decimal number from <s> of length <l> and pushes it on the stack )
@@ -265,6 +294,21 @@ _h_asm:
 ; prints the c string pointed to by <eax> to stdout
 ; returns: void - <eax> undefined
 _putstr:
+%ifidn __OUTPUT_FORMAT__, macho32
+    ; OSX
+    push eax                ; save string base for later math
+    call _strlen            ; length now in eax
+    pop  ebx                ; str
+    push eax                ; length
+    push ebx                ; str
+    push 1                  ; fd
+    mov  eax, 4
+    sub  esp, 4             ; extra space for assumed sys_call function
+    int  80h
+    add  esp, 16
+    ret
+%else
+    ; Linux
     push eax                ; save string base for later math
     call _strlen            ; length now in eax
     mov  edx, eax           ; edx = length
@@ -274,11 +318,13 @@ _putstr:
     int  80h
     ret
 
-; prints the c string pointed to by <eax> to stdout, followed by NEWLINE
+%endif
+
+; prints the c string pointed to by <eax> to stdout, followed by (platform specific) EOL suffix
 ; returns: void - <eax> undefined
 _puts:
     call _putstr
-    putc(NEWLINE)
+    @CR
     ret
 
 ; string pointer in <eax>, return string length in <eax>
@@ -464,11 +510,26 @@ reverse_bytes:
 ; increments <input_p> one byte when complete
 ; return 0 on error/EOF or ASCII value of char read otherwise
 _getc:
+%ifidn __OUTPUT_FORMAT__, macho32
+    ; OSX
+    mov  ecx, [input_p]     ; where to read
+	push 1					; buffer len/read len
+	push ecx				; buffer ptr
+	push 0					; fd 0 = stdin
+	mov  eax, 3				; sys_read
+    sub  esp, 4				; extra room
+    int  80h
+%else
+    ; Linux
     mov  ecx, [input_p]     ; where to read
     mov  edx, 1             ; # bytes to read
     mov  eax, 3             ; sys_read
     mov  ebx, 0             ; fd 0 = stdin
     int  80h
+    cmp  eax, 0             ; # bytes read
+%endif
+
+	add  esp, 16
     cmp  eax, 0             ; # bytes read
     ja   .getcok
     je   .geteof
@@ -624,7 +685,7 @@ interpret:
 ;
 ; -----------------------------
 
-_start:
+__ASM_MAIN:
 _uforth:
     call init
     call banner

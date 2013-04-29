@@ -4,13 +4,23 @@ SOURCES=uforth.asm
 OBJECTS=uforth.o
 
 AS=nasm
-ASFLAGS=-g -f elf
+ASFLAGS=-g
 
 RM=rm -f
 
 LD=ld
 LDFLAGS=
-#LDFLAGS=-s
+
+
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S), Darwin)
+	ASFLAGS += -f macho32
+	LDFLAGS += -arch i386
+else
+	ASFLAGS += -f i386
+	ARCH=elf32
+endif
+
 
 # delete default suffix list
 .SUFFIXES:
