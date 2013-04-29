@@ -116,9 +116,15 @@ section .text
 %endmacro
 
 %macro putc 1
+    push eax
+    push ebx
+    push ecx
     mov  eax, %1
     @PUSH_EAX
     @EMIT
+    pop  ecx
+    pop  ebx
+    pop  eax
 %endmacro
 
 ; -----------------------------
@@ -166,14 +172,15 @@ _emit_asm:
     directcall 0
     @POP_EAX
     push eax
+    mov  ecx, esp
 
     push 1                  ; length
-    push eax                ; str
+    push ecx                ; str ptr of "push eax" above
     push 1                  ; fd
     mov  eax, 4
     sub  esp, 4             ; extra space
     int  80h
-    add  esp, 16
+    add  esp, 16            ; the 16 we push - excluding extra space
     pop  eax
     ret
 %else
@@ -638,6 +645,8 @@ find:
 ; execute a word
 ; eax holds pointer to string of word (name) to execute
 execute:
+    push eax
+    pop  eax
     push eax                ; ptr to word name/str
     call find
     cmp  eax, 0
