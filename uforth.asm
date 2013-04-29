@@ -644,8 +644,6 @@ find:
 ; execute a word
 ; eax holds pointer to string of word (name) to execute
 execute:
-    push eax
-    pop  eax
     push eax                ; ptr to word name/str
     call find
     cmp  eax, 0
