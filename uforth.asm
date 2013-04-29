@@ -519,6 +519,7 @@ _getc:
 	mov  eax, 3				; sys_read
     sub  esp, 4				; extra room
     int  80h
+	add  esp, 16
 %else
     ; Linux
     mov  ecx, [input_p]     ; where to read
@@ -526,10 +527,7 @@ _getc:
     mov  eax, 3             ; sys_read
     mov  ebx, 0             ; fd 0 = stdin
     int  80h
-    cmp  eax, 0             ; # bytes read
 %endif
-
-	add  esp, 16
     cmp  eax, 0             ; # bytes read
     ja   .getcok
     je   .geteof
