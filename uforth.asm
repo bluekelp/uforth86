@@ -595,15 +595,23 @@ next_ptr:
     cmp  eax, 0
     jz   .exit              ; return NULL if ptr is NULL
     mov  C_local(1), eax    ; dict entry in local #1
-    call _strlen
-    mov  C_local(2), eax    ; strlen in local #2
-    mov  eax, C_local(1)    ; dict ptr
-    mov  ebx, C_local(2)    ; strlen of name
-    add  eax, ebx           ; add strlen of dict entry name
-    inc  eax                ; +1 to skip null byte
-    mov  eax, [eax]         ; value of next ptr into eax for return
+    call dict_after_name
+    mov  eax, [eax]         ; value of next ptr into eax for return (dict_after_name+0 == next ptr)
 .exit:
     C_epilogue
+    ret
+
+; the part of a dictionary entry after the name of the word
+; dict entry in eax, results left in eax
+dict_after_name:
+    push ebx
+    push eax
+    call _strlen
+    mov  ebx, eax
+    pop  eax                ; orig ptr
+    add  eax, ebx
+    inc  eax                ; for the NULL at end of string
+    pop  ebx
     ret
 
 ; return ptr to dict entry if string <eax> found in dictionary, NULL otherwise
