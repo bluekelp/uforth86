@@ -1,6 +1,6 @@
 
 %define TAB     9
-%define SPACE   ' '         ; ASCII 20h
+%define SPACE   ' '                         ; ASCII 20h
 %define CR      13
 %define NEWLINE 10
 %define NL      NEWLINE
@@ -167,11 +167,11 @@ _emit_asm:
     @POP_EAX
     push eax
 
-    push 1            ; length
-    push eax            ; str
-    push 1              ; fd
+    push 1                  ; length
+    push eax                ; str
+    push 1                  ; fd
     mov  eax, 4
-    sub  esp, 4         ; extra space
+    sub  esp, 4             ; extra space
     int  80h
     add  esp, 16
     pop  eax
@@ -204,7 +204,7 @@ _number_asm:
     pop  edx                ; string pointer
     push eax
     mov  eax, 0
-.numloop:
+.loop:
     imul eax, 10            ; 10 = base; ok to do when eax = 0 b/c 0*10 still = 0
     mov  ebx, 0
     mov  bl, [edx]          ; bl = (char)*p
@@ -216,13 +216,13 @@ _number_asm:
     add  eax, ebx
     cmp  ecx, 1
     ; check for last char
-    je   .numexit
+    je   .exit
     ; prepare for next digit
     dec  ecx
     inc  edx
-    jmp  .numloop
+    jmp  .loop
 .badchar:
-.numexit:
+.exit:
     @PUSH_EAX               ; uses eax - push result on data stack
     ret
 
@@ -310,12 +310,12 @@ _puts:
 ; string pointer in <eax>, return string length in <eax>
 _strlen:
     push eax
-.strlenloop:
+.loop:
     cmp  [eax], byte 0
-    je   .strlenexit
+    je   .exit
     inc  eax
-    jmp  .strlenloop
-.strlenexit:
+    jmp  .loop
+.exit:
     pop  ebx
     sub  eax, ebx           ; <eax> now has strlen (current-original)
     ret
@@ -325,21 +325,21 @@ _strlen:
 _strtok:
     push eax                ; original pointer
     mov  ebx, eax
-.strtokloop:
+.loop:
     ; read byte and check if space/tab
     mov  eax, 0
     mov  al, [ebx]
     ; compare to terminators
     cmp  al, 0
-    je   .strtokexit
+    je   .exit
     cmp  al, SPACE
-    je   .strtokexit
+    je   .exit
     cmp  al, TAB
-    je   .strtokexit
+    je   .exit
     ; prep for next char (if any)
     inc  ebx
-    jmp  .strtokloop
-.strtokexit:
+    jmp  .loop
+.exit:
     mov  [ebx], BYTE 0      ; overwrite SPACE/TAB with null
     mov  eax, ebx
     pop  ebx                ; original pointer
@@ -348,14 +348,14 @@ _strtok:
 
 ; copies string <ebx> into string <eax> (like strcpy(eax, ebx))
 _strcpy:
-.strcpyloop:
+.loop:
     mov  ecx, 0
     mov  cl, [ebx]
     mov  [eax], cl
     inc  eax
     inc  ebx
     cmp  cl, 0              ; compare after copy to ensure null terminated
-    jne  .strcpyloop
+    jne  .loop
     ret
 
 ; reverse chars in the string <eax>
@@ -368,9 +368,9 @@ _strrev:
     dec  ebx                ; string + strlen() - 1  // -1 is b/c reverse_bytes's 2nd pointer is inclusive
     pop  eax                ; string
     cmp  eax, ebx
-    jae  .strrevexit        ; exit w/o reversing if start >= stop (check b/c of the strlen()-1 above on 1 byte strings, etc.)
+    jae  .exit              ; exit w/o reversing if start >= stop (check b/c of the strlen()-1 above on 1 byte strings, etc.)
     call reverse_bytes
-.strrevexit:
+.exit:
     ret
 
 ; compares <eax> to <ebx>;  returns -1 if string eax < ebx, 0 if same, 1 if ebx > eax
@@ -390,17 +390,17 @@ _strcmpi:
 ; compares <eax> to <ebx>;  returns -1 if string eax < ebx, 0 if same, 1 if ebx > eax
 ; eax and ebx must not be same
 _strcmpx:
-.strcmpxloop:
+.loop:
     mov  dl, [eax]
     mov  dh, [ebx]
     inc  eax
     inc  ebx
     cmp  dl, 0
-    je   .strcmpxadone
+    je   .adone
     cmp  dl, 0
-    je   .strcmpxbdone
+    je   .bdone
     cmp  ecx, 0             ; check if case insensitive compare
-    jz   .strcmpxcompare
+    jz   .compare
     cmp  dl, 41h            ; convert to lowercase, as necessary
     jb   .firstdone
     cmp  dl, 5ah
@@ -413,25 +413,25 @@ _strcmpx:
     ja   .seconddone
     or   dh, 20h
 .seconddone:
-.strcmpxcompare:
+.compare:
     cmp  dl, dh             ; <--- compare
-    jb   .strcmpxaless
-    ja   .strcmpxbless
-    jmp  .strcmpxloop
+    jb   .aless
+    ja   .bless
+    jmp  .loop
 
-.strcmpxadone:
+.adone:
     cmp  dh, 0
-    je   .strcmpxsame
-.strcmpxaless:
+    je   .same
+.aless:
     mov  eax, -1
     ret
-.strcmpxbdone:
+.bdone:
     cmp  dl, 0
-    je   .strcmpxsame
-.strcmpxbless:
+    je   .same
+.bless:
     mov  eax, 1
     ret
-.strcmpxsame:
+.same:
     mov  eax, 0
     ret
 
@@ -448,7 +448,7 @@ _itoa:
     mov  [scratchp], DWORD scratch    ; scratchp = &scratch
     mov  ecx, [scratchp]    ; ecx = scratchp
     mov  ebx, 10            ; radix
-._itoaloop:
+.loop:
     mov  edx, 0             ; upper portion of number to divide - set to 0 to just use eax
     idiv ebx                ; divides eax by ebx
     ; edx=remainder eax=quotient
@@ -456,8 +456,8 @@ _itoa:
     mov  [ecx], dl          ; (char*)*scratchp = (byte)edx
     inc  ecx
     cmp  eax, 0
-    jne  ._itoaloop          ; next char if more (if eax > ebx (radix))
-._itoaexit:
+    jne  .loop              ; next char if more (if eax > ebx (radix))
+.exit:
     mov  [scratchp], ecx    ; scratchp = ecx (stores all increments)
     ; reverse bytes in scratch
     mov  eax, ecx           ; eax = ecx = scratchp
@@ -473,22 +473,23 @@ _itoa:
 ; eax - pointer to start of buffer
 ; ebx - pointer to   end of buffer (inclusive)
 reverse_bytes:
-.reverseloop:
+.loop:
     cmp  eax, ebx           ; src <= dest?
-    jae  .reverseexit       ; jae = unsigned, jge = signed
+    jae  .exit              ; jae = unsigned, jge = signed
     mov  cl, [eax]          ; cl = *src
     mov  ch, [ebx]          ; ch = *dest
     mov  [eax], ch          ; *src = ch
     mov  [ebx], cl          ; *dest = cl
     inc  eax                ; src++
     dec  ebx                ; dest--
-    jmp  .reverseloop
-.reverseexit:
+    jmp  .loop
+.exit:
     ret
 
 ; waits for a char from stdin and stores in current location of [input_p].
 ; increments <input_p> one byte when complete
-; return 0 on error/EOF or ASCII value of char read otherwise
+; return 0 on EOF or ASCII value of char read otherwise
+; return <0 on error
 _getc:
 %ifidn __OUTPUT_FORMAT__, macho32
     ; OSX
@@ -509,15 +510,15 @@ _getc:
     int  80h
 %endif
     cmp  eax, 0             ; # bytes read
-    ja   .getcok
-    je   .geteof
-.getcerr:
+    ja   .ok
+    je   .eof
+.err:
     mov  eax, -1
     ret
-.geteof:
+.eof:
     mov  eax, 0
     ret
-.getcok:
+.ok:
     mov  eax, [input_p]
     mov  al,  [eax]
     add  [input_p], DWORD 1 ; increment by a byte (1), not an int (4)
@@ -528,26 +529,26 @@ _getc:
 ; value of <input_p> when this fx is called
 ; no return value
 _gets:
-.getsloop:
+.loop:
     mov eax, 0
     call _getc
     cmp  al, ENTER
-    je   .getsenter
+    je   .enter
     cmp  eax, 0             ; EOF
-    je   .getseof
-    jl   .getserr           ; other error
-    jmp  .getsloop
-.getseof:
+    je   .eof
+    jl   .err               ; other error
+    jmp  .loop
+.eof:
     mov [eof], BYTE 1
-    jmp .getsok
-.getserr:
+    jmp .ok
+.err:
     call error
     ret
-.getsenter:
+.enter:
     mov  eax, [input_p]
     dec  eax                ; backup to NEWLINE
     mov  [eax], BYTE 0      ; make sure null terminated instead of NEWLINE
-.getsok:
+.ok:
     ret
 
 ; init globals
@@ -589,6 +590,7 @@ _exit:
     mov  eax, 1             ; sys_exit
     int  80h
 
+__cdecl
 next_ptr:
     C_prologue(8)
     mov  eax, C_param(1)    ; 1st param (dict ptr)
@@ -603,20 +605,30 @@ next_ptr:
     C_epilogue
     ret
 
-; return 0 if string <eax> found in dictionary
+; return ptr to dict entry if string <eax> found in dictionary, NULL otherwise
 __cdecl_hybrid
 find:
-    C_prologue(12)
-    mov  C_local(1), eax    ; word string ptr
+    C_prologue(8)
+    mov  C_local(1), eax    ; string ptr (word name) to find
     mov  ebx, [dict]
     mov  C_local(2), ebx    ; first dict entry
-    push DWORD C_local(2)   ; param 1 - dict ptr
-    call next_ptr
-    add  esp, 4             ; 1 param
-    mov  C_local(3), eax    ; next dict entry ptr
-    mov  ebx, C_local(2)
+.loop:
     mov  eax, C_local(1)    ; word string ptr
     call _strcmpi
+    cmp  eax, 0
+    jz   .exit
+
+    push DWORD C_local(2)   ; dict walker ptr
+    call next_ptr
+    add  esp, 4             ; 1 param
+
+    mov  ebx, eax           ; next dict entry ptr in ebx (b/c .loop expects it)
+    mov  C_local(2), eax    ; next dict entry ptr
+    cmp  eax, 0
+    jz   .exit
+    jmp  .loop
+.exit:
+    mov  eax, C_local(2)
     C_epilogue
     ret
 
@@ -626,13 +638,13 @@ execute:
     push eax                ; ptr to word name/str
     call find
     cmp  eax, 0
-    jne  .executenotfound
+    jne  .notfound
     ; else found - execute word
-.executeexit:
+.exit:
     pop  eax
     mov  eax, 0
     ret
-.executenotfound:
+.notfound:
     mov  eax, word_not_found_str
     call _putstr
     pop  eax                ; ptr to word name/str
@@ -645,19 +657,19 @@ quit:
     mov  [input_p], DWORD input
     call _gets              ; leaves string in [input]
     cmp  [eof], BYTE 0
-    jne  .quitexit
+    jne  .exit
     mov  eax, input
     call interpret
     call ok
     @CR
     jmp  quit
-.quitexit:
+.exit:
     ret
 
 ; handle input/words found in <eax> pointer
 interpret:
     mov  [tokenp], eax      ; token walker (TODO move pointer to be local to this function)
-.interpretloop:
+.loop:
     call _strtok
 
     push eax                ; token size
@@ -672,9 +684,9 @@ interpret:
     mov  [tokenp], eax
     mov  ebx, [input_p]
     cmp  eax, ebx
-    jae  .interpretloopexit ; at/past last token
-    jmp  .interpretloop
-.interpretloopexit:
+    jae  .exit              ; at/past last token
+    jmp  .loop
+.exit:
     mov  eax, 0
     ret
 
