@@ -4,12 +4,12 @@ SOURCES=uforth.asm
 OBJECTS=uforth.o
 
 AS=nasm
-ASFLAGS=-g -f elf
+ASFLAGS=-g -f macho32
 
 RM=rm -f
 
 LD=ld
-LDFLAGS=
+LDFLAGS=-arch i386
 #LDFLAGS=-s
 
 # delete default suffix list
@@ -20,6 +20,9 @@ LDFLAGS=
 
 .PHONY: default
 default: $(SOURCES) $(EXECUTABLE)
+
+.PHONY: all
+all: default
 
 .PHONY: run
 run: $(EXECUTABLE)

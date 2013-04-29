@@ -29,8 +29,10 @@ section .bss
     scratchp:       resd 1                  ; tmp int to use
     eof:            resb 1                  ; set to true when EOF detected
 
+%define __ASM_MAIN start
+
 section .text
-    global _start
+    global __ASM_MAIN
 
 %macro directcall 1
     ; nothing
@@ -115,14 +117,18 @@ dd NUMBER                   ; link pointer
 dd _emit_asm                ; code pointer
                             ; param field empty - primitive assembly
 _emit_asm:
+_emit_asm_osx:
     directcall 0
     @POP_EAX
     push eax
-    mov  ecx, esp           ; ecx = ptr to str to write (need ptr so we use esp trick, not eax directly)
-    mov  edx, 1             ; # bytes to write
-    mov  eax, 4             ; sys_write
-    mov  ebx, 1             ; fd 1 = stdout
+
+    push 1            ; length
+    push eax            ; str
+    push 1              ; fd
+    mov  eax, 4
+    sub  esp, 4         ; extra space
     int  80h
+    add  esp, 16
     pop  eax
     ret
 
@@ -220,13 +226,17 @@ H:
 ; prints the c string pointed to by <eax> to stdout, followed by NEWLINE
 ; returns: void - <eax> undefined
 _puts:
-    push eax                ; save string base for later math
+_puts_osx:
+    push eax                ; str
     call _strlen            ; length now in eax
-    mov  edx, eax           ; edx = length
-    pop  ecx                ; base string location (for len math)
-    mov  eax, 4             ; sys_write
-    mov  ebx, 1             ; fd 1 = stdout
+    pop  ebx            ; str
+    push eax            ; length
+    push ebx            ; str
+    push 1              ; fd
+    mov  eax, 4
+    sub  esp, 4         ; extra space
     int  80h
+    add  esp, 16
     putc(NEWLINE)
     ret
 
@@ -403,11 +413,15 @@ reverse_bytes:
 ; increments <input_p> one byte when complete
 ; return 0 on error/EOF or ASCII value of char read otherwise
 _getc:
+_getc_osx:
     mov  ecx, [input_p]     ; where to read
-    mov  edx, 1             ; # bytes to read
-    mov  eax, 3             ; sys_read
-    mov  ebx, 0             ; fd 0 = stdin
+	push 1					; buffer len/read len
+	push ecx				; buffer ptr
+	push 0					; fd 0 = stdin
+	mov  eax, 3				; sys_read
+    sub  esp, 4				; extra room
     int  80h
+	add  esp, 16
     cmp  eax, 0             ; # bytes read
     ja   .getcok
     je   .geteof
@@ -547,7 +561,7 @@ words:
 ;
 ; -----------------------------
 
-_start:
+__ASM_MAIN:
 _uforth:
     call init
     call banner
