@@ -235,9 +235,33 @@ _dot_asm:
     putc(' ')
     ret
 
+; ( x y -- z , add x and y and push result )
+PLUS:
+DICT_ENTRY '+', DOT, _plus_asm
+_plus_asm:
+    @POP_EAX
+    push eax                ; POP_EAX clobbers ebx
+    @POP_EAX
+    pop  ebx
+    add  eax, ebx
+    @PUSH_EAX
+    ret
+
+; ( x y -- z , add x and y and push result )
+MINUS:
+DICT_ENTRY '-', PLUS, _minus_asm
+_minus_asm:
+    @POP_EAX
+    push eax                ; POP_EAX clobbers ebx
+    @POP_EAX
+    pop  ebx
+    sub  eax, ebx
+    @PUSH_EAX
+    ret
+
 ; -- add new Forth words *above* this one - keep this as head of list so init code doesn't have to be updated
 H:
-DICT_ENTRY 'h', DOT, _h_asm
+DICT_ENTRY 'h', MINUS, _h_asm
 _h_asm:
     mov eax, [dict]
     @PUSH_EAX
