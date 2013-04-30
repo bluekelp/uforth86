@@ -1,77 +1,27 @@
 
-%define TAB     9
-%define SPACE   ' '                         ; ASCII 20h
-%define CR      13
-%define NEWLINE 10
-%define NL      NEWLINE
-%define ENTER   NEWLINE
-%define NULL    0
+%include "defines.inc"
 
-%define cstr(x) db x, 0
+extern _push_asm
+extern _pop_asm
+extern _emit_asm
 
-%define __cdecl             ; used to annotate a routine uses c calling convention
+extern _putstr
+extern _puts
 
-%define __cdecl_hybrid      ; used to annotate a routine uses a *modified* c calling convention
-                            ; no params to routine are pushed on stack. parameters are
-                            ; expected in eax, ebx, ecx, and/or edx.
-                            ; simplifies caller too b/c no need to adjust/pop params from stack after
+extern _strcmpi
+extern _strlen
+extern _strtok
 
-%macro C_prologue 1
-    push ebp
-    mov  ebp, esp
-    sub  esp, %1
-    push edi
-    push esi
-%endmacro
-
-%macro C_epilogue 0
-    pop  esi
-    pop  edi
-    mov  esp, ebp
-    pop  ebp
-    ret
-%endmacro
-
-; index-1 based local parameter (e.g., C_local(1) is our first local dword
-%define C_local(x) [ebp-(x*4)]
-
-; index-1 based parameter to routine (e.g., C_param(1) = first param) - always assumes dword param size
-; C_param(0) is undefined
-%define C_param(x)  [ebp+(4+(x*4))]
-
-;; --
+extern H
 
 
-%macro @PUSH_EAX 0
-    call _push_asm
-%endmacro
-
-%macro @POP_EAX 0
-    call _pop_asm
-%endmacro
-
-%macro @EMIT 0
-    call _emit_asm
-%endmacro
-
-%macro @CR 0
+global eol
+eol:
     push eax
     mov  eax, eol_str
     call _putstr
     pop  eax
-%endmacro
-
-%macro putc 1
-    push eax
-    push ebx
-    push ecx
-    mov  eax, %1
-    @PUSH_EAX
-    @EMIT
-    pop  ecx
-    pop  ebx
-    pop  eax
-%endmacro
+    ret
 
 
 ;; ----------
@@ -89,6 +39,11 @@ section .data
 %define STACK_SIZE      128
 %define INPUT_BUFSIZE   128
 %define SCRATCH_BUFSIZE 128
+
+global dict
+global dsp
+global dsentinel
+global scratch
 
 section .bss
     dstack:         resd STACK_SIZE         ; data-stack - no overflow detection
@@ -123,567 +78,6 @@ _uforth:
     call banner
     call quit               ; main loop of Forth; does not "quit" the app
     call _exit              ; use whatever is in eax currently
-
-
-
-; -----------------------------
-;
-; Forth primitive words, with dictionary headers
-;
-; -----------------------------
-
-; DICT_ENTRY name_cstr, nextDictEntry, code_ptr
-%macro DICT_ENTRY 3
-    cstr(%1)                ; name (null terminated)
-    dd  %2                  ; next dict ptr
-    dd  %3                  ; code ptr
-    dd  0                   ; param ptr
-%endmacro
-
-; ( -- n, pushes <eax> into the stack as a cell )
-PUSH_EAX:
-DICT_ENTRY 'push_eax', NULL, _push_asm
-_push_asm:
-    mov  ebx, [dsp]         ; load pointer
-    sub  ebx, 4             ; decrement (push)
-    ; TODO check overflow?
-    mov  [ebx], eax         ; store value
-    mov  [dsp], ebx         ; update pointer
-    ret
-
-; ( n -- , pop a cell off stack, leaves it in <eax> )
-POP_EAX:
-DICT_ENTRY 'pop_eax', PUSH_EAX, _pop_asm
-_pop_asm:
-    mov  ebx, [dsp]         ; load pointer
-    cmp  ebx, dsentinel
-    jae  .underflow
-    mov  eax, [ebx] ; <---- ; fetch value
-    add  ebx, 4             ; increment (pop)
-    mov  [dsp], ebx         ; update pointer
-    jmp  .exit
-.underflow:
-    mov  eax, 0
-.exit:
-    ret
-
-; ( c -- , pops a cell and prints its first byte to stdout )
-EMIT:
-DICT_ENTRY 'emit', POP_EAX, _emit_asm
-_emit_asm:
-%ifidn __OUTPUT_FORMAT__, macho32
-    ; OSX
-    @POP_EAX
-    push eax
-    mov  ecx, esp
-
-    push 1                  ; length
-    push ecx                ; str ptr of "push eax" above
-    push 1                  ; fd
-    mov  eax, 4
-    sub  esp, 4             ; extra space
-    int  80h
-    add  esp, 16            ; the 16 we push - excluding extra space
-    pop  eax
-    ret
-%else
-    ; Linux
-    @POP_EAX
-    push eax
-    mov  ecx, esp           ; ecx = ptr to str to write (need ptr so we use esp trick, not eax directly)
-    mov  edx, 1             ; # bytes to write
-    mov  eax, 4             ; sys_write
-    mov  ebx, 1             ; fd 1 = stdout
-    int  80h
-    pop  eax
-    ret
-%endif
-
-
-; ( -- n , push address of top of stack (i.e., the empty stack position) to stack )
-S0:
-DICT_ENTRY 's0', POP_EAX, _s0_asm
-_s0_asm:
-    mov  eax, dsentinel
-    @PUSH_EAX
-    ret
-
-; ( -- n , push address of current stack pointer to stack )
-TICK_S:
-DICT_ENTRY "'s", S0, _tick_s_asm
-_tick_s_asm:
-    mov  eax, [dsp]
-    @PUSH_EAX
-    ret
-
-; ( -- x , compute current stack depth and push that value onto stack )
-DEPTH:
-DICT_ENTRY 'depth', TICK_S, _depth_asm
-_depth_asm:
-    call forth_stack_depth
-    @PUSH_EAX
-    ret
-
-; ( x -- , pop one number off stack and print it )
-DOT:
-DICT_ENTRY '.', DEPTH, _dot_asm
-_dot_asm:
-    @POP_EAX
-    call _itoa
-    mov  eax, scratch
-    call _putstr
-    putc(' ')
-    ret
-
-; ( x y -- z , add x and y and push result )
-PLUS:
-DICT_ENTRY '+', DOT, _plus_asm
-_plus_asm:
-    @POP_EAX
-    push eax                ; POP_EAX clobbers ebx
-    @POP_EAX
-    pop  ebx
-    add  eax, ebx
-    @PUSH_EAX
-    ret
-
-; ( x y -- z , subtract y from x and push result )
-__LAST:
-MINUS:
-DICT_ENTRY '-', PLUS, _minus_asm
-_minus_asm:
-    @POP_EAX
-    push eax                ; POP_EAX clobbers ebx
-    @POP_EAX
-    pop  ebx
-    sub  eax, ebx
-    @PUSH_EAX
-    ret
-
-
-;; words to add:
-; DROP
-; DUP
-; ?DUP
-; !
-; @
-; : ( COMPILER )
-; FORGET xxx
-; ROT
-; SWAP
-; OVER
-; DO ... LOOP
-; -2 (see p50)
-; IF ... ELSE .. THEN
-; ." ( PRINT STRING )
-; ' xxx ( FIND xxx )
-; =
-; <
-; >
-; 0=
-; 0<
-; 0>
-; NOT
-; AND
-; OR
-; XOR    (not a standard Forth word?)
-; ABORT"
-; ?STACK
-; 1+
-; 1-
-; 2+
-; 2-
-; 2+
-; 2/
-; ABS
-; MIN
-; MAX
-; >R (see p110)
-; R>
-; I
-; I'
-; J
-;
-; ---- loops (Ch 6 p133)
-; +LOOP
-; BEGIN ... UNTIL
-; BEGIN ... WHILE ... REPEAT
-; LEAVE
-; PAGE (not really a loop construct)
-; U.R ( unsigned right justified number print )
-; QUIT (redo in Forth)
-;
-; ----
-; U.
-; U/MOD
-; U<
-; DO ... /LOOP
-;
-; ---- OR consider S. S/MOD S< and such to make signed math the odd case
-;
-; ----
-; HEX
-; OCTAL
-; DECIMAL
-; BASE
-;
-; ---- double size numbers (p165-166)
-; D.
-; DABS
-; D+
-; D-
-; DNEGATE
-; DMAX
-; DMIN
-; D=
-; D0=
-; D<
-; DU<
-; D.R
-;
-; #
-; <#
-; #>
-; #S
-; TYPE
-; HOLD
-; SIGN
-;
-; ---- mixed length opers
-; M+
-; M/
-; M*
-; M*/
-;
-; ---- above described p177-179
-;
-; ---- "higher" math
-; *
-; /
-; /MOD
-; MOD
-; */
-; */MOD
-;
-; ---- 2x words
-; 2SWAP
-; 2DUP
-; 2OVER
-; 2DROP
-;
-; ---- blocks and editing (See Ch 3)
-; LIST
-; LOAD
-; L (current/last block?)
-; T ( n -- , select current line)
-; P ( puts rest of line (stdin) into current block line ; uses gets but stores to block ; see p65 for more like "P  " )
-; F
-; I
-; E
-; D
-; R
-; TILL
-; U
-; X
-; WIPE
-; N
-; B
-; FLUSH
-; COPY
-; S
-; M
-; ^
-; EMPTY
-;
-; ---- p183 Ch 8
-; VARIABLE xxx
-; EXECUTE (need to replace asm verstion)
-; +!                            : +! DUP @ ROT + SWAP ! ;
-; ?
-; CONSTANT xxx
-; 2!
-; 2@
-; 2CONSTANT xxx
-; ALLOT
-; FILL
-; ERASE
-; DUMP
-; C!
-; C@
-; CREATE xxx
-; C,
-; ,
-; BASE
-; 2VARIABLE xxx
-; 0
-; 1
-; 0.
-;
-; ----
-; INTERPRET                     : INTERPRET  BEGIN -' IF NUMBER ELSE EXECUTE ?STACK ABORT" STACK EMPTY" THEN 0 UNTIL ;
-; -'
-; HERE                          : HERE H @ ;
-; ,                             : , HERE ! 2 ALLOT ;
-; ' xxx
-; [']
-; EXIT
-; QUIT
-; PAD                           : PAD HERE <XXX> + ;  (where <XXX> is some internal buffer size/padding)
-; OPERATOR
-;
-; ----
-; SCR
-; S0
-; R#
-; BASE
-; H
-; CONTEXT
-; CURRENT
-; >IN
-; BLK
-; OFFSET
-; USER
-;
-; ---- contexts
-; FORTH
-; EDITOR
-; ASSEMBLER
-;
-; ----
-; DEFINITIONS                   : DEFINITIONS   CONTEXT @   CURRENT ! ;
-; LOCATE xxx
-;
-; ----
-; LIST
-; UPDATE
-; FLUSH
-; SAVE-BUFFERS
-; EMPTY-BUFFERS
-; COPY
-; BLOCK
-; BUFFER
-; -TRAILING
-; >TYPE
-; TYPE
-; MOVE
-; CMOVE
-; <CMOVE
-; KEY                           ( !! )
-; EXPECT
-; WORD
-; TEXT
-; QUERY
-; >IN
-; TEXT                          : TEXT   PAD  72 32 FILL  WORD  COUNT PAD SWAP <CMOVE ;
-; >BINARY
-; CONVERT
-; NUMBER                        (p279)
-; PTR
-; COUNT
-; -TEXT
-; CMOVE
-; BLANK
-;
-; ----
-; CREATE
-; DOES>
-; IMMEDIATE
-; BEGIN                         : BEGIN HERE ; IMMEDIATE
-; COMPILE xxx
-; [COMPILE] xxx
-; LITERAL
-; (LITERAL)   (not sure about this one)
-; [                             -- leave compile mode
-; ]                             -- enter compile mode
-; ]                             : ]  BEGIN -' IF (NUMBER) LITERAL ELSE (check precedence bit) IF EXECUTE ?STACK ABORT" STACK EMPTY" ELSE 2- , THEN THEN 0 UNTIL ;
-;
-; -- implemented in terms of others (put in a block? expect compiled from stdin?)
-; SPACE                         : SPACE 20 EMIT ;
-;
-; ---- the assembler
-; ---- date/time functions
-; ---- more OS sys_calls (open, unlink, stat, brk, fork(!), close, etc.)
-; ---- memcpy
-; ---- see 4-1 for summary of Forth words (by category)
-
-
-; -- add new Forth words *above* this one - keep this as head of list so init code doesn't have to be updated
-H:
-DICT_ENTRY 'h', __LAST, _h_asm
-_h_asm:
-    mov eax, [dict]
-    @PUSH_EAX
-    ret
-
-; -----------------------------
-;
-; c string functions
-;
-; -----------------------------
-
-; prints the c string pointed to by <eax> to stdout
-; returns: void - <eax> undefined
-_putstr:
-%ifidn __OUTPUT_FORMAT__, macho32
-    ; OSX
-    push eax                ; save string base for later math
-    call _strlen            ; length now in eax
-    pop  ebx                ; str
-    push eax                ; length
-    push ebx                ; str
-    push 1                  ; fd
-    mov  eax, 4
-    sub  esp, 4             ; extra space for assumed sys_call function
-    int  80h
-    add  esp, 16
-    ret
-%else
-    ; Linux
-    push eax                ; save string base for later math
-    call _strlen            ; length now in eax
-    mov  edx, eax           ; edx = length
-    pop  ecx                ; base string location (for len math)
-    mov  eax, 4             ; sys_write
-    mov  ebx, 1             ; fd 1 = stdout
-    int  80h
-    ret
-
-%endif
-
-; prints the c string pointed to by <eax> to stdout, followed by (platform specific) EOL suffix
-; returns: void - <eax> undefined
-_puts:
-    call _putstr
-    @CR
-    ret
-
-; string pointer in <eax>, return string length in <eax>
-_strlen:
-    push eax
-.loop:
-    cmp  [eax], byte 0
-    je   .exit
-    inc  eax
-    jmp  .loop
-.exit:
-    pop  ebx
-    sub  eax, ebx           ; <eax> now has strlen (current-original)
-    ret
-
-; parse string pointed to by <eax> and return # chars in its first token in <eax>
-; writes a null in the string at the boundary of the token (the terminating space/tab)
-_strtok:
-    push eax                ; original pointer
-    mov  ebx, eax
-.loop:
-    ; read byte and check if space/tab
-    mov  eax, 0
-    mov  al, [ebx]
-    ; compare to terminators
-    cmp  al, 0
-    je   .exit
-    cmp  al, SPACE
-    je   .exit
-    cmp  al, TAB
-    je   .exit
-    ; prep for next char (if any)
-    inc  ebx
-    jmp  .loop
-.exit:
-    mov  [ebx], BYTE 0      ; overwrite SPACE/TAB with null
-    mov  eax, ebx
-    pop  ebx                ; original pointer
-    sub  eax, ebx           ; length
-    ret
-
-; copies string <ebx> into string <eax> (like strcpy(eax, ebx))
-_strcpy:
-.loop:
-    mov  ecx, 0
-    mov  cl, [ebx]
-    mov  [eax], cl
-    inc  eax
-    inc  ebx
-    cmp  cl, 0              ; compare after copy to ensure null terminated
-    jne  .loop
-    ret
-
-; reverse chars in the string <eax>
-_strrev:
-    push eax
-    push eax
-    call _strlen
-    pop  ebx
-    add  ebx, eax
-    dec  ebx                ; string + strlen() - 1  // -1 is b/c reverse_bytes's 2nd pointer is inclusive
-    pop  eax                ; string
-    cmp  eax, ebx
-    jae  .exit              ; exit w/o reversing if start >= stop (check b/c of the strlen()-1 above on 1 byte strings, etc.)
-    call reverse_bytes
-.exit:
-    ret
-
-; compares <eax> to <ebx>;  returns -1 if string eax < ebx, 0 if same, 1 if ebx > eax
-; eax and ebx must not be same
-_strcmp:
-    mov  ecx, 0
-    call _strcmpx
-    ret
-
-; _strcmpi ; uppercase chars are 20h lower than lower case in ASCII
-; eax and ebx must not be same
-_strcmpi:
-    mov  ecx, 1
-    call _strcmpx
-    ret
-
-; compares <eax> to <ebx>;  returns -1 if string eax < ebx, 0 if same, 1 if ebx > eax
-; eax and ebx must not be same
-_strcmpx:
-.loop:
-    mov  dl, [eax]
-    mov  dh, [ebx]
-    inc  eax
-    inc  ebx
-    cmp  dl, 0
-    je   .adone
-    cmp  dl, 0
-    je   .bdone
-    cmp  ecx, 0             ; check if case insensitive compare
-    jz   .compare
-    cmp  dl, 41h            ; convert to lowercase, as necessary
-    jb   .firstdone
-    cmp  dl, 5ah
-    ja   .firstdone
-    or   dl, 20h
-.firstdone:
-    cmp  dh, 41h
-    jb   .seconddone
-    cmp  dh, 5ah
-    ja   .seconddone
-    or   dh, 20h
-.seconddone:
-.compare:
-    cmp  dl, dh             ; <--- compare
-    jb   .aless
-    ja   .bless
-    jmp  .loop
-
-.adone:
-    cmp  dh, 0
-    je   .same
-.aless:
-    mov  eax, -1
-    ret
-.bdone:
-    cmp  dl, 0
-    je   .same
-.bless:
-    mov  eax, 1
-    ret
-.same:
-    mov  eax, 0
-    ret
 
 
 ; -----------------------------
@@ -723,6 +117,7 @@ number:
 
 
 ; writes eax as unsigned decimal string to <scratch> and return length in eax
+global _itoa
 _itoa:
     ; eax = number to convert
     mov  [scratchp], DWORD scratch    ; scratchp = &scratch
@@ -753,6 +148,7 @@ _itoa:
 
 ; eax - pointer to start of buffer
 ; ebx - pointer to   end of buffer (inclusive)
+global reverse_bytes
 reverse_bytes:
 .loop:
     cmp  eax, ebx           ; src <= dest?
@@ -841,6 +237,7 @@ init:
     ret
 
 ; ( -- , returns the depth of the Forth stack in <eax> )
+global forth_stack_depth
 forth_stack_depth:
     ; dsentinal - 4 bytes = top
     mov  eax, dsentinel

@@ -1,7 +1,7 @@
 
 EXECUTABLE=uforth
-SOURCES=uforth.asm
-OBJECTS=uforth.o
+SOURCES=uforth.asm cstring.asm dict.asm
+OBJECTS=uforth.o cstring.o dict.o
 
 AS=nasm
 ASFLAGS=-g
