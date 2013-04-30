@@ -9,46 +9,6 @@
 
 %define cstr(x) db x, 0
 
-section .data
-    banner_str: cstr('uforth v0.0.6')
-    ok_str:     cstr('ok ')
-    error_str:  cstr('error ')
-    word_not_found_str: cstr('word not found: ')
-    null_str:   cstr('')
-    test_str:   cstr('test')
-%ifidn __OUTPUT_FORMAT__, macho32
-    eol_str:    db CR, NL, 0
-%else
-    eol_str:    db NL, 0
-%endif
-
-%define STACK_SIZE      128
-%define INPUT_BUFSIZE   128
-%define SCRATCH_BUFSIZE 128
-
-section .bss
-    dstack:         resd STACK_SIZE         ; data-stack - no overflow detection
-    dsentinel:      resd 1                  ; top of the stack - sentinel value to detect underflow
-    dsp:            resd 1                  ; data-stack pointer (current stack head)
-    dict:           resd 1                  ; pointer to start of dictionary list (H)
-    input:          resb INPUT_BUFSIZE
-    input_p:        resd 1                  ; pointer to current location in input
-    tokenp:         resd 1                  ; misc pointer to use
-    scratch:        resb SCRATCH_BUFSIZE    ; tmp buffer to use
-    scratchp:       resd 1                  ; tmp int to use
-    eof:            resb 1                  ; set to true when EOF detected
-
-%ifidn __OUTPUT_FORMAT__, macho32
-%define __ASM_MAIN start
-%else
-%define __ASM_MAIN _start
-%endif
-
-section .text
-    global __ASM_MAIN
-
-;;
-
 %define __cdecl             ; used to annotate a routine uses c calling convention
 
 %define __cdecl_hybrid      ; used to annotate a routine uses a *modified* c calling convention
@@ -123,6 +83,63 @@ section .text
     pop  ebx
     pop  eax
 %endmacro
+
+
+;; ---------- 
+
+
+section .data
+    banner_str: cstr('uforth v0.9.0')
+    ok_str:     cstr('ok ')
+    error_str:  cstr('error ')
+    word_not_found_str: cstr('word not found: ')
+    null_str:   cstr('')
+    test_str:   cstr('test')
+%ifidn __OUTPUT_FORMAT__, macho32
+    eol_str:    db CR, NL, 0
+%else
+    eol_str:    db NL, 0
+%endif
+
+%define STACK_SIZE      128
+%define INPUT_BUFSIZE   128
+%define SCRATCH_BUFSIZE 128
+
+section .bss
+    dstack:         resd STACK_SIZE         ; data-stack - no overflow detection
+    dsentinel:      resd 1                  ; top of the stack - sentinel value to detect underflow
+    dsp:            resd 1                  ; data-stack pointer (current stack head)
+    dict:           resd 1                  ; pointer to start of dictionary list (H)
+    input:          resb INPUT_BUFSIZE
+    input_p:        resd 1                  ; pointer to current location in input
+    tokenp:         resd 1                  ; misc pointer to use
+    scratch:        resb SCRATCH_BUFSIZE    ; tmp buffer to use
+    scratchp:       resd 1                  ; tmp int to use
+    eof:            resb 1                  ; set to true when EOF detected
+
+%ifidn __OUTPUT_FORMAT__, macho32
+%define __ASM_MAIN start
+%else
+%define __ASM_MAIN _start
+%endif
+
+section .text
+    global __ASM_MAIN
+
+; -----------------------------
+;
+; entry
+;
+; -----------------------------
+
+__ASM_MAIN:
+_uforth:
+    call init
+    call banner
+    call quit               ; main loop of Forth; does not "quit" the app
+    call _exit              ; use whatever is in eax currently
+
+
 
 ; -----------------------------
 ;
@@ -709,15 +726,4 @@ interpret:
     mov  eax, 0
     ret
 
-; -----------------------------
-;
-; entry
-;
-; -----------------------------
 
-__ASM_MAIN:
-_uforth:
-    call init
-    call banner
-    call quit               ; main loop of Forth; does not "quit" the app
-    call _exit              ; use whatever is in eax currently
