@@ -32,17 +32,14 @@
     ret
 %endmacro
 
-; -- macros to help access local vars and params
-;    only full sized ints are supported
-
-; index-1 based local parameter (e.g., C_local(1) is our first local
+; index-1 based local parameter (e.g., C_local(1) is our first local dword
 %define C_local(x) [ebp-(x*4)]
 
-; index-1 based parameter to routine (e.g., C_param(1) = first param)
+; index-1 based parameter to routine (e.g., C_param(1) = first param) - always assumes dword param size
 ; C_param(0) is undefined
 %define C_param(x)  [ebp+(4+(x*4))]
 
-;;
+;; --
 
 
 %macro @PUSH_EAX 0
@@ -85,15 +82,12 @@
 %endmacro
 
 
-;; ---------- 
+;; ----------
 
 
 section .data
-    banner_str: cstr('uforth v0.9.0')
+    banner_str: cstr('uforth v0.9.2')
     ok_str:     cstr(' ok')
-    error_str:  cstr('error ')
-    null_str:   cstr('')
-    test_str:   cstr('test')
 %ifidn __OUTPUT_FORMAT__, macho32
     eol_str:    db CR, NL, 0
 %else
@@ -557,7 +551,6 @@ _gets:
     mov [eof], BYTE 1
     jmp .ok
 .err:
-    call error
     ret
 .enter:
     mov  eax, [input_p]
@@ -591,11 +584,6 @@ banner:
 
 ok:
     mov  eax, ok_str
-    call _putstr
-    ret
-
-error:
-    mov  eax, error_str
     call _putstr
     ret
 
