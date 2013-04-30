@@ -248,6 +248,7 @@ _plus_asm:
     ret
 
 ; ( x y -- z , subtract y from x and push result )
+__LAST:
 MINUS:
 DICT_ENTRY '-', PLUS, _minus_asm
 _minus_asm:
@@ -261,7 +262,7 @@ _minus_asm:
 
 ; -- add new Forth words *above* this one - keep this as head of list so init code doesn't have to be updated
 H:
-DICT_ENTRY 'h', MINUS, _h_asm
+DICT_ENTRY 'h', __LAST, _h_asm
 _h_asm:
     mov eax, [dict]
     @PUSH_EAX
