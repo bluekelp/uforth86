@@ -54,10 +54,6 @@
     call _emit_asm
 %endmacro
 
-%macro @TOKEN 0
-    call _token_asm
-%endmacro
-
 %macro @CR 0
     push eax
     mov  eax, eol_str
@@ -204,19 +200,9 @@ _emit_asm:
 %endif
 
 
-; parses a string (<eax>) and pushes the number of bytes in the first token onto the Forth stack
-; <eax> returned is also token length
-TOKEN:
-DICT_ENTRY 'token', EMIT, _token_asm
-_token_asm:
-    pop  ebx                ; return value
-    call _strtok
-    @PUSH_EAX
-    ret
-
 ; ( -- n , push address of top of stack (i.e., the empty stack position) to stack )
 S0:
-DICT_ENTRY 's0', TOKEN, _s0_asm
+DICT_ENTRY 's0', POP_EAX, _s0_asm
 _s0_asm:
     mov  eax, dsentinel
     @PUSH_EAX
