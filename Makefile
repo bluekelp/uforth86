@@ -31,6 +31,9 @@ endif
 .PHONY: default
 default: $(SOURCES) $(EXECUTABLE)
 
+.PHONY: all
+all: default
+
 .PHONY: run
 run: $(EXECUTABLE)
 	@./$(EXECUTABLE)
