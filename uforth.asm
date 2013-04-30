@@ -160,13 +160,14 @@ POP_EAX:
 DICT_ENTRY 'pop_eax', PUSH_EAX, _pop_asm
 _pop_asm:
     mov  ebx, [dsp]         ; load pointer
+    cmp  ebx, dsentinel
+    jae  .underflow
     mov  eax, [ebx] ; <---- ; fetch value
     add  ebx, 4             ; increment (pop)
-    cmp  ebx, dsentinel
-    ja   .underflow
     mov  [dsp], ebx         ; update pointer
     jmp  .exit
 .underflow:
+    mov  eax, 0
 .exit:
     ret
 
