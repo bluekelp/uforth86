@@ -473,6 +473,7 @@ _itoa:
     add  edx, '0'           ; convert to ASCII char
     mov  [ecx], dl          ; (char*)*scratchp = (byte)edx
     inc  ecx
+    mov  [ecx], byte 0      ; always terminate string
     cmp  eax, 0
     jne  .loop              ; next char if more (if eax > ebx (radix))
 .exit:
