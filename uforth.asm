@@ -648,7 +648,16 @@ execute:
     call find
     cmp  eax, 0
     jz   .notfound
-    ; else found - execute word
+    call dict_after_name    ; eax is now ptr to the "next" link in header
+    add  eax, 4             ; eax is now code ptr
+    cmp  [eax+4], DWORD 0   ; is "param ptr" set?
+    jnz  .forth
+.primitive:                 ; word is an asm primitive
+    mov  eax, [eax]         ; dereference code pointer to addr
+    call eax
+    jmp  .exit
+.forth:                     ; word is a list of forth words
+    ; TODO
 .exit:
     pop  eax
     mov  eax, 0
