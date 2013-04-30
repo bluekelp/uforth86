@@ -247,7 +247,7 @@ _plus_asm:
     @PUSH_EAX
     ret
 
-; ( x y -- z , add x and y and push result )
+; ( x y -- z , subtract y from x and push result )
 MINUS:
 DICT_ENTRY '-', PLUS, _minus_asm
 _minus_asm:
