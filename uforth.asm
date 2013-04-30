@@ -90,9 +90,8 @@
 
 section .data
     banner_str: cstr('uforth v0.9.0')
-    ok_str:     cstr('ok ')
+    ok_str:     cstr(' ok')
     error_str:  cstr('error ')
-    word_not_found_str: cstr('word not found: ')
     null_str:   cstr('')
     test_str:   cstr('test')
 %ifidn __OUTPUT_FORMAT__, macho32
@@ -681,15 +680,13 @@ execute:
     mov  eax, 0
     ret
 .notfound:
-    mov  eax, word_not_found_str
-    call _putstr
-    pop  eax                ; ptr to word name/str
-    call _puts
+    pop  eax
     mov  eax, -1
     ret
 
 ; Forth's quit - outer loop that calls INTERPRET
 quit:
+.loop:
     mov  [input_p], DWORD input
     call _gets              ; leaves string in [input]
     cmp  [eof], BYTE 0
@@ -698,7 +695,7 @@ quit:
     call interpret
     call ok
     @CR
-    jmp  quit
+    jmp  .loop
 .exit:
     ret
 
@@ -707,13 +704,16 @@ interpret:
     mov  [tokenp], eax      ; token walker (TODO move pointer to be local to this function)
 .loop:
     call _strtok
-
     push eax                ; token size
+    cmp  eax, 0
+    jz   .skip              ; skip zero-length tokens
     mov  eax, [tokenp]
     call execute
-    ; TODO honor return code
+.skip:
     pop  ecx                ; token size
-
+    cmp  eax, 0             ; will remain zero for zero-length tokens = ok
+    jnz  .error
+.next:
     mov  eax, [tokenp]
     add  eax, ecx
     inc  eax
@@ -722,8 +722,14 @@ interpret:
     cmp  eax, ebx
     jae  .exit              ; at/past last token
     jmp  .loop
+.error:                     ; output "<word>? " on unknown word
+    mov  eax, [tokenp]
+    call _putstr
+    putc('?')
+    mov  eax, -1
+    ret
 .exit:
     mov  eax, 0
     ret
 
-
+;;
