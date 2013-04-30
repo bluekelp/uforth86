@@ -260,6 +260,253 @@ _minus_asm:
     @PUSH_EAX
     ret
 
+
+;; words to add:
+; DROP
+; DUP
+; ?DUP
+; !
+; @
+; : ( COMPILER )
+; FORGET xxx
+; ROT
+; SWAP
+; OVER
+; DO ... LOOP
+; -2 (see p50)
+; IF ... ELSE .. THEN
+; ." ( PRINT STRING )
+; ' xxx ( FIND xxx )
+; =
+; <
+; >
+; 0=
+; 0<
+; 0>
+; NOT
+; AND
+; OR
+; XOR    (not a standard Forth word?)
+; ABORT"
+; ?STACK
+; 1+
+; 1-
+; 2+
+; 2-
+; 2+
+; 2/
+; ABS
+; MIN
+; MAX
+; >R (see p110)
+; R>
+; I
+; I'
+; J
+;
+; ---- loops (Ch 6 p133)
+; +LOOP
+; BEGIN ... UNTIL
+; BEGIN ... WHILE ... REPEAT
+; LEAVE
+; PAGE (not really a loop construct)
+; U.R ( unsigned right justified number print )
+; QUIT (redo in Forth)
+;
+; ----
+; U.
+; U/MOD
+; U<
+; DO ... /LOOP
+;
+; ---- OR consider S. S/MOD S< and such to make signed math the odd case
+;
+; ----
+; HEX
+; OCTAL
+; DECIMAL
+; BASE
+;
+; ---- double size numbers (p165-166)
+; D.
+; DABS
+; D+
+; D-
+; DNEGATE
+; DMAX
+; DMIN
+; D=
+; D0=
+; D<
+; DU<
+; D.R
+;
+; #
+; <#
+; #>
+; #S
+; TYPE
+; HOLD
+; SIGN
+;
+; ---- mixed length opers
+; M+
+; M/
+; M*
+; M*/
+;
+; ---- above described p177-179
+;
+; ---- "higher" math
+; *
+; /
+; /MOD
+; MOD
+; */
+; */MOD
+;
+; ---- 2x words
+; 2SWAP
+; 2DUP
+; 2OVER
+; 2DROP
+;
+; ---- blocks and editing (See Ch 3)
+; LIST
+; LOAD
+; L (current/last block?)
+; T ( n -- , select current line)
+; P ( puts rest of line (stdin) into current block line ; uses gets but stores to block ; see p65 for more like "P  " )
+; F
+; I
+; E
+; D
+; R
+; TILL
+; U
+; X
+; WIPE
+; N
+; B
+; FLUSH
+; COPY
+; S
+; M
+; ^
+; EMPTY
+;
+; ---- p183 Ch 8
+; VARIABLE xxx
+; EXECUTE (need to replace asm verstion)
+; +!                            : +! DUP @ ROT + SWAP ! ;
+; ?
+; CONSTANT xxx
+; 2!
+; 2@
+; 2CONSTANT xxx
+; ALLOT
+; FILL
+; ERASE
+; DUMP
+; C!
+; C@
+; CREATE xxx
+; C,
+; ,
+; BASE
+; 2VARIABLE xxx
+; 0
+; 1
+; 0.
+;
+; ----
+; INTERPRET                     : INTERPRET  BEGIN -' IF NUMBER ELSE EXECUTE ?STACK ABORT" STACK EMPTY" THEN 0 UNTIL ;
+; -'
+; HERE                          : HERE H @ ;
+; ,                             : , HERE ! 2 ALLOT ;
+; ' xxx
+; [']
+; EXIT
+; QUIT
+; PAD                           : PAD HERE <XXX> + ;  (where <XXX> is some internal buffer size/padding)
+; OPERATOR
+;
+; ----
+; SCR
+; S0
+; R#
+; BASE
+; H
+; CONTEXT
+; CURRENT
+; >IN
+; BLK
+; OFFSET
+; USER
+;
+; ---- contexts
+; FORTH
+; EDITOR
+; ASSEMBLER
+;
+; ----
+; DEFINITIONS                   : DEFINITIONS   CONTEXT @   CURRENT ! ;
+; LOCATE xxx
+;
+; ----
+; LIST
+; UPDATE
+; FLUSH
+; SAVE-BUFFERS
+; EMPTY-BUFFERS
+; COPY
+; BLOCK
+; BUFFER
+; -TRAILING
+; >TYPE
+; TYPE
+; MOVE
+; CMOVE
+; <CMOVE
+; KEY                           ( !! )
+; EXPECT
+; WORD
+; TEXT
+; QUERY
+; >IN
+; TEXT                          : TEXT   PAD  72 32 FILL  WORD  COUNT PAD SWAP <CMOVE ;
+; >BINARY
+; CONVERT
+; NUMBER                        (p279)
+; PTR
+; COUNT
+; -TEXT
+; CMOVE
+; BLANK
+;
+; ----
+; CREATE
+; DOES>
+; IMMEDIATE
+; BEGIN                         : BEGIN HERE ; IMMEDIATE
+; COMPILE xxx
+; [COMPILE] xxx
+; LITERAL
+; (LITERAL)   (not sure about this one)
+; [                             -- leave compile mode
+; ]                             -- enter compile mode
+; ]                             : ]  BEGIN -' IF (NUMBER) LITERAL ELSE (check precedence bit) IF EXECUTE ?STACK ABORT" STACK EMPTY" ELSE 2- , THEN THEN 0 UNTIL ;
+;
+; -- implemented in terms of others (put in a block? expect compiled from stdin?)
+; SPACE                         : SPACE 20 EMIT ;
+;
+; ---- the assembler
+; ---- date/time functions
+; ---- more OS sys_calls (open, unlink, stat, brk, fork(!), close, etc.)
+; ---- memcpy
+; ---- see 4-1 for summary of Forth words (by category)
+
+
 ; -- add new Forth words *above* this one - keep this as head of list so init code doesn't have to be updated
 H:
 DICT_ENTRY 'h', __LAST, _h_asm
