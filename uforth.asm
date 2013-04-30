@@ -209,16 +209,16 @@ _s0_asm:
     ret
 
 ; ( -- n , push address of current stack pointer to stack )
-TICKS:
-DICT_ENTRY "'s", S0, _tickS_asm
-_tickS_asm:
+TICK_S:
+DICT_ENTRY "'s", S0, _tick_s_asm
+_tick_s_asm:
     mov  eax, [dsp]
     @PUSH_EAX
     ret
 
 ; ( -- x , compute current stack depth and push that value onto stack )
 DEPTH:
-DICT_ENTRY 'depth', TICKS, _depth_asm
+DICT_ENTRY 'depth', TICK_S, _depth_asm
 _depth_asm:
     call forth_stack_depth
     @PUSH_EAX
