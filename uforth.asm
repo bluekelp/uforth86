@@ -214,6 +214,7 @@ _token_asm:
     @PUSH_EAX
     ret
 
+; ( -- n , push address of top of stack (i.e., the empty stack position) to stack )
 S0:
 DICT_ENTRY 's0', TOKEN, _s0_asm
 _s0_asm:
@@ -221,6 +222,7 @@ _s0_asm:
     @PUSH_EAX
     ret
 
+; ( -- n , push address of current stack pointer to stack )
 TICKS:
 DICT_ENTRY "'s", S0, _tickS_asm
 _tickS_asm:
@@ -228,6 +230,7 @@ _tickS_asm:
     @PUSH_EAX
     ret
 
+; ( -- x , compute current stack depth and push that value onto stack )
 DEPTH:
 DICT_ENTRY 'depth', TICKS, _depth_asm
 _depth_asm:
@@ -235,6 +238,7 @@ _depth_asm:
     @PUSH_EAX
     ret
 
+; ( x -- , pop one number off stack and print it )
 DOT:
 DICT_ENTRY '.', DEPTH, _dot_asm
 _dot_asm:
