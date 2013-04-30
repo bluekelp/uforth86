@@ -49,11 +49,12 @@ section .text
 
 ;;
 
-%define __cdecl             ; used to annotate a route uses c calling convention
+%define __cdecl             ; used to annotate a routine uses c calling convention
 
-%define __cdecl_hybrid      ; used to annotate a route uses c calling convention - modified
-                            ; in that no params to routine are pushed on stack. parameters are
-                            ; expected in eax, ebx, ecx, and/or edx
+%define __cdecl_hybrid      ; used to annotate a routine uses a *modified* c calling convention
+                            ; no params to routine are pushed on stack. parameters are
+                            ; expected in eax, ebx, ecx, and/or edx.
+                            ; simplifies caller too b/c no need to adjust/pop params from stack after
 
 %macro C_prologue 1
     push ebp
@@ -718,5 +719,5 @@ __ASM_MAIN:
 _uforth:
     call init
     call banner
-    call quit               ; main loop does not "quit" the app - is Forth's quit word
+    call quit               ; main loop of Forth; does not "quit" the app
     call _exit              ; use whatever is in eax currently
