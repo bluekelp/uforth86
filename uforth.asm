@@ -58,10 +58,6 @@
     call _token_asm
 %endmacro
 
-%macro @NUMBER 0
-    call _number_asm
-%endmacro
-
 %macro @CR 0
     push eax
     mov  eax, eol_str
@@ -154,6 +150,7 @@ DICT_ENTRY 'push_eax', NULL, _push_asm
 _push_asm:
     mov  ebx, [dsp]         ; load pointer
     sub  ebx, 4             ; decrement (push)
+    ; TODO check overflow?
     mov  [ebx], eax         ; store value
     mov  [dsp], ebx         ; update pointer
     ret
@@ -165,7 +162,12 @@ _pop_asm:
     mov  ebx, [dsp]         ; load pointer
     mov  eax, [ebx] ; <---- ; fetch value
     add  ebx, 4             ; increment (pop)
+    cmp  ebx, dsentinel
+    ja   .underflow
     mov  [dsp], ebx         ; update pointer
+    jmp  .exit
+.underflow:
+.exit:
     ret
 
 ; ( c -- , pops a cell and prints its first byte to stdout )
@@ -201,45 +203,10 @@ _emit_asm:
 %endif
 
 
-; x86 stack: ( s l -- )
-; ( -- n , parses a decimal number from <s> of length <l> and pushes it on the stack )
-; undefined if <l> less than 1
-; <n> will by 10x too large if we encounter an ASCII char outside '0'..'9' but otherwise ok
-NUMBER:
-DICT_ENTRY 'number', EMIT, _number_asm
-_number_asm:
-    pop  eax
-    pop  ecx                ; length
-    pop  edx                ; string pointer
-    push eax
-    mov  eax, 0
-.loop:
-    imul eax, 10            ; 10 = base; ok to do when eax = 0 b/c 0*10 still = 0
-    mov  ebx, 0
-    mov  bl, [edx]          ; bl = (char)*p
-    cmp  ebx, '0'
-    jb   .badchar
-    cmp  ebx, '9'
-    ja   .badchar
-    sub  ebx, '0'           ; difference is decimal 0..9
-    add  eax, ebx
-    cmp  ecx, 1
-    ; check for last char
-    je   .exit
-    ; prepare for next digit
-    dec  ecx
-    inc  edx
-    jmp  .loop
-.badchar:
-.exit:
-    @PUSH_EAX               ; uses eax - push result on data stack
-    ret
-
-
 ; parses a string (<eax>) and pushes the number of bytes in the first token onto the Forth stack
 ; <eax> returned is also token length
 TOKEN:
-DICT_ENTRY 'token', NUMBER, _token_asm
+DICT_ENTRY 'token', EMIT, _token_asm
 _token_asm:
     pop  ebx                ; return value
     call _strtok
@@ -267,8 +234,19 @@ _depth_asm:
     @PUSH_EAX
     ret
 
+DOT:
+DICT_ENTRY '.', DEPTH, _dot_asm
+_dot_asm:
+    @POP_EAX
+    call _itoa
+    mov  eax, scratch
+    call _putstr
+    putc(' ')
+    ret
+
+; -- add new Forth words *above* this one - keep this as head of list so init code doesn't have to be updated
 H:
-DICT_ENTRY 'h', DEPTH, _h_asm
+DICT_ENTRY 'h', DOT, _h_asm
 _h_asm:
     mov eax, [dict]
     @PUSH_EAX
@@ -450,6 +428,36 @@ _strcmpx:
 ; support functions
 ;
 ; -----------------------------
+
+; ( -- n | -- , attempts to parse a decimal number from <eax> and push it on the Forth stack )
+; <n> will by 10x too large if we encounter an ASCII char outside '0'..'9' but otherwise ok
+; if empty string given, will push 0 to Forth stack
+; does not handle negative numbers or other bases, currently
+number:
+    mov  edx, eax
+    mov  eax, 0
+.loop:
+    mov  ebx, 0
+    mov  bl, [edx]          ; bl = (char)*p
+    cmp  ebx, 0
+    jz   .done              ; stop on \0; will push 0 if zero-length input given
+    cmp  ebx, '0'
+    jb   .badchar
+    cmp  ebx, '9'
+    ja   .badchar
+    sub  ebx, '0'           ; difference is decimal 0..9
+    imul eax, 10            ; 10 = base; ok to do when eax = 0 b/c 0*10 still = 0
+    add  eax, ebx
+    inc  edx
+    jmp  .loop
+.done:
+    @PUSH_EAX               ; uses eax - push result on data stack
+    mov  eax, 0
+    ret
+.badchar:
+    mov  eax, -1
+    ret
+
 
 ; writes eax as unsigned decimal string to <scratch> and return length in eax
 _itoa:
@@ -652,7 +660,7 @@ execute:
     push eax                ; ptr to word name/str
     call find
     cmp  eax, 0
-    jz   .notfound
+    jz   .trynumber
     call dict_after_name    ; eax is now ptr to the "next" link in header
     add  eax, 4             ; eax is now code ptr
     cmp  [eax+4], DWORD 0   ; is "param ptr" set?
@@ -660,13 +668,19 @@ execute:
 .primitive:                 ; word is an asm primitive
     mov  eax, [eax]         ; dereference code pointer to addr
     call eax
-    jmp  .exit
+    jmp  .ok
 .forth:                     ; word is a list of forth words
     ; TODO
-.exit:
+.ok:
     pop  eax
     mov  eax, 0
     ret
+.trynumber:
+    mov  eax, [esp]         ; pull eax from stack w/o popping
+    call number
+    cmp  eax, 0
+    jnz  .notfound
+    jmp  .ok
 .notfound:
     pop  eax
     mov  eax, -1
@@ -683,6 +697,7 @@ quit:
     call interpret
     call ok
     @CR
+    ; TODO move EOF check here?
     jmp  .loop
 .exit:
     ret
