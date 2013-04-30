@@ -41,6 +41,10 @@ $(EXECUTABLE): $(OBJECTS)
 .asm.o:
 	@$(AS) $(ASFLAGS) $<
 
+.PHONY: clean
 clean:
 	@$(RM) $(EXECUTABLE) $(OBJECTS)
 
+.PHONY: strip
+strip:
+	@strip $(EXECUTABLE) $(OBJECTS)
