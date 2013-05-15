@@ -32,11 +32,13 @@ global _pop_asm
 PUSH_EAX:
 DICT_ENTRY 'push_eax', NULL, _push_asm
 _push_asm:
+    push ebx
     mov  ebx, [dsp]         ; load pointer
     sub  ebx, 4             ; decrement (push)
     ; TODO check overflow?
     mov  [ebx], eax         ; store value
     mov  [dsp], ebx         ; update pointer
+    pop  ebx
     ret
 
 ; ( n -- , pop a cell off stack, leaves it in <eax> )
