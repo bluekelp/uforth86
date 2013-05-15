@@ -140,7 +140,6 @@ _plus_asm:
     ret
 
 ; ( x y -- z , subtract y from x and push result )
-__LAST:
 MINUS:
 DICT_ENTRY '-', PLUS, _minus_asm
 _minus_asm:
@@ -152,18 +151,111 @@ _minus_asm:
     @PUSH_EAX
     ret
 
+; ( x y -- z , multiply x times y and push result )
+MULTIPLY:
+DICT_ENTRY '*', MINUS, _multiply_asm
+_multiply_asm:
+    @POP_EAX
+    push eax                ; POP_EAX clobbers ebx
+    @POP_EAX
+    pop  ebx
+    imul eax, ebx
+    @PUSH_EAX
+    ret
+
+; ( n -- , remove element from top of stack )
+DROP:
+DICT_ENTRY 'drop', MULTIPLY, _drop_asm
+_drop_asm:
+    push eax
+    @POP_EAX
+    pop  eax
+    ret
+
+DUP:
+DICT_ENTRY 'dup', DROP, _dup_asm
+_dup_asm:
+    @POP_EAX
+    @PUSH_EAX
+    @PUSH_EAX
+    ret
+
+; ( a -- v , loads addr of memory at <a> and puts value as <v> )
+LOAD_ADDR:
+DICT_ENTRY '@', DUP, _load_addr_asm
+_load_addr_asm:
+    @POP_EAX
+    mov  eax, [eax]
+    @PUSH_EAX
+    ret
+
+; ( v a -- , puts value v at address a )
+STORE_ADDR:
+DICT_ENTRY '!', LOAD_ADDR, _store_addr_asm
+_store_addr_asm:
+    @POP_EAX                    ; addr
+    mov ebx, eax
+    @POP_EAX                    ; value
+    mov [ebx], eax
+    ret
+
+; ( a b -- b a , swap top two cells )
+SWAP:
+DICT_ENTRY 'swap', STORE_ADDR, _swap_asm
+_swap_asm:
+    @POP_EAX
+    push eax
+    @POP_EAX
+    mov  ebx, eax
+    pop  eax
+    @PUSH_EAX
+    mov  eax, ebx
+    @PUSH_EAX
+    ret
+
+; ( a b c -- b c a , rotate cells )
+; highly inefficient - redo to access cells directly? (need to properly detect underflow)
+ROT:
+DICT_ENTRY 'rot', SWAP, _rot_asm
+_rot_asm:
+    C_prologue 12
+    @POP_EAX
+    mov C_local(3), eax
+    @POP_EAX
+    mov C_local(2), eax
+    @POP_EAX
+    mov C_local(1), eax
+    ; j
+    mov eax, C_local(2)
+    @PUSH_EAX
+    mov eax, C_local(3)
+    @PUSH_EAX
+    mov eax, C_local(1)
+    @PUSH_EAX
+    C_epilogue
+    ret
+
+__LAST:
+; ( a b -- a b a )
+OVER:
+DICT_ENTRY 'over', ROT, _over_asm
+_over_asm:
+    @POP_EAX                ; b
+    mov  ebx, eax
+    @POP_EAX                ; a
+    mov  ecx, eax
+    mov  eax, ebx
+    @PUSH_EAX               ; a
+    mov  eax, ecx
+    @PUSH_EAX               ; b
+    mov  eax, ebx
+    @PUSH_EAX
+    ret
 
 ;; words to add:
-; DROP
-; DUP
 ; ?DUP
-; !
-; @
 ; : ( COMPILER )
 ; FORGET xxx
-; ROT
-; SWAP
-; OVER
 ; DO ... LOOP
 ; -2 (see p50)
 ; IF ... ELSE .. THEN
