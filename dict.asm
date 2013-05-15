@@ -94,7 +94,7 @@ _emit_asm:
 
 ; ( -- n , push address of top of stack (i.e., the empty stack position) to stack )
 S0:
-DICT_ENTRY 's0', POP_EAX, _s0_asm
+DICT_ENTRY 's0', EMIT, _s0_asm
 _s0_asm:
     mov  eax, dsentinel
     @PUSH_EAX
