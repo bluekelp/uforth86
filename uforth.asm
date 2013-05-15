@@ -319,13 +319,33 @@ find:
     C_epilogue
     ret
 
-; execute a word
+; execute a word (given its string name)
 ; eax holds pointer to string of word (name) to execute
-execute:
+execute_str:
     push eax                ; ptr to word name/str
     call find
-    cmp  eax, 0
-    jz   .trynumber
+    cmp  eax, 0             ; find returns 0 if not found
+    jz   .trynumber         ; word name not found, try interpreting as a number
+    call execute            ; else execute the (found) word - eax is ptr to its dict entry
+.ok:
+    pop  eax
+    mov  eax, 0             ; success
+    ret
+.trynumber:
+    mov  eax, [esp]         ; "peek" eax from stack w/o popping
+    call number
+    cmp  eax, 0             ; success?
+    jz   .ok                ; else fallthru
+.notfound:
+    pop  eax
+    mov  eax, -1
+    ret
+
+
+; execute a word
+; eax holds pointer to dictionary entry of word to execute
+execute:
+    push eax                ; ptr to dict entry
     call dict_after_name    ; eax is now ptr to the "next" link in header
     add  eax, 4             ; eax is now code ptr
     cmp  [eax+4], DWORD 0   ; is "param ptr" set?
@@ -335,17 +355,21 @@ execute:
     call eax
     jmp  .ok
 .forth:                     ; word is a list of forth words
-    add  eax, 4             ; param ptr (word list)
+    add  eax, 4             ; eax now param ptr (word list)
+    mov  eax, [eax]         ; dereference pointer to get list of dict entries to execute
+.next:
+    cmp  [eax], DWORD 0     ; end of list?
+    je   .ok
+    push eax                ; current dict entry pointer
+    mov  eax, [eax]         ; dereference word ptr
+    call execute
+    pop  eax                ; b/c execute clobbers w/0/1 for success/failure
+    add  eax, 4             ; next word pointer
+    jmp  .next
 .ok:
     pop  eax
     mov  eax, 0
     ret
-.trynumber:
-    mov  eax, [esp]         ; pull eax from stack w/o popping
-    call number
-    cmp  eax, 0
-    jnz  .notfound
-    jmp  .ok
 .notfound:
     pop  eax
     mov  eax, -1
@@ -383,7 +407,7 @@ interpret:
     cmp  eax, 0
     jz   .skip              ; skip zero-length tokens
     mov  eax, [tokenp]
-    call execute
+    call execute_str
 .skip:
     pop  ecx                ; token size
     cmp  eax, 0             ; will remain zero for zero-length tokens = ok

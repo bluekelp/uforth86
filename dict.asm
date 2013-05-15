@@ -32,6 +32,14 @@ global _pop_asm
     dd  0                   ; param ptr
 %endmacro
 
+; DICT_WORD name_cstr, nextDictEntry, param_ptr
+%macro DICT_WORD 3
+    cstr(%1)                ; name (null terminated)
+    dd  %2                  ; next dict ptr
+    dd  0                   ; code ptr
+    dd  %3                  ; param ptr
+%endmacro
+
 ; ( -- n, pushes <eax> into the stack as a cell )
 PUSH_EAX:
 DICT_PRIMITIVE 'push_eax', NULL, _push_asm
@@ -290,7 +298,6 @@ _push_0_asm:
     @PUSH_EAX
     ret
 
-__LAST:
 ; ( -- 1 , pushes 1 on the stack )
 PUSH_1:
 DICT_PRIMITIVE '1', PUSH_0, _push_1_asm
@@ -298,6 +305,35 @@ _push_1_asm:
     mov  eax, 1
     @PUSH_EAX
     ret
+
+; ( -- 4 , computes the number 4 (useful for adding/subtracting cells addresses or DWORD pointer increment/decrements )
+COMPUTE_FOUR:
+DICT_WORD 'compute4', PUSH_1, _compute_4_list
+_compute_4_list:
+    dd  PUSH_1
+    dd  DUP
+    dd  PLUS
+    dd  DUP
+    dd  MULTIPLY
+    dd  0
+
+; ( x1 x2 ... xN -- , clears stack ; implemented as a Forth word to test ability to call and chain other words together )
+CLEAR:
+DICT_WORD 'clear', COMPUTE_FOUR, _clear_list
+_clear_list:
+    dd  S0
+    dd  S0
+    dd  COMPUTE_FOUR
+    dd  PLUS            ; add 4 to S0 (S0+4 = dsp)
+    dd  STORE_ADDR
+    dd  0
+
+; ( -- , do nothing ; implemented as a Forth word to test Forth's ability to stop when a null in the param list is encountered )
+__LAST:
+NOOP:
+DICT_WORD 'noop', CLEAR, _noop_list
+_noop_list:
+    dd 0
 
 ;; words to add:
 ; ?DUP
