@@ -335,7 +335,7 @@ execute:
     call eax
     jmp  .ok
 .forth:                     ; word is a list of forth words
-    ; TODO
+    add  eax, 4             ; param ptr (word list)
 .ok:
     pop  eax
     mov  eax, 0
