@@ -193,10 +193,12 @@ _load_addr_asm:
 STORE_ADDR:
 DICT_ENTRY '!', LOAD_ADDR, _store_addr_asm
 _store_addr_asm:
+    push ebx
     @POP_EAX                    ; addr
-    mov ebx, eax
+    mov  ebx, eax
     @POP_EAX                    ; value
-    mov [ebx], eax
+    mov  [ebx], eax
+    pop  ebx
     ret
 
 ; ( a b -- b a , swap top two cells )
@@ -417,7 +419,6 @@ _over_asm:
 ;
 ; ----
 ; SCR
-; S0
 ; R#
 ; BASE
 ; H
