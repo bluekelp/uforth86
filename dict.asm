@@ -266,7 +266,6 @@ _rot_asm:
     C_epilogue
     ret
 
-__LAST:
 ; ( a b -- a b a )
 OVER:
 DICT_ENTRY 'over', ROT, _over_asm
@@ -280,6 +279,23 @@ _over_asm:
     mov  eax, ecx
     @PUSH_EAX               ; b
     mov  eax, ebx
+    @PUSH_EAX
+    ret
+
+; ( -- 0 , pushes 0 on the stack )
+PUSH_0:
+DICT_ENTRY '0', OVER, _push_0_asm
+_push_0_asm:
+    mov  eax, 0
+    @PUSH_EAX
+    ret
+
+__LAST:
+; ( -- 1 , pushes 1 on the stack )
+PUSH_1:
+DICT_ENTRY '1', PUSH_0, _push_1_asm
+_push_1_asm:
+    mov  eax, 1
     @PUSH_EAX
     ret
 
