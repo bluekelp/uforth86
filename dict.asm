@@ -201,9 +201,34 @@ _store_addr_asm:
     pop  ebx
     ret
 
+; ( a -- v , loads a byte from memory at addr <a> and puts value as <v> on stack ; v will be in [0, 255] inclusive )
+LOAD_8_ADDR:
+DICT_ENTRY 'c@', STORE_ADDR, _load_8_addr_asm
+_load_8_addr_asm:
+    @POP_EAX
+    push ebx
+    mov  ebx, 0
+    mov  bl, [eax]
+    mov  eax, ebx
+    pop  ebx
+    @PUSH_EAX
+    ret
+
+; ( v a -- , puts 8-bit value v at address a ; if cell value <v> is >255 only 8 least significant bits stored )
+STORE_8_ADDR:
+DICT_ENTRY 'c!', LOAD_8_ADDR, _store_8_addr_asm
+_store_8_addr_asm:
+    push ebx
+    @POP_EAX                    ; addr
+    mov  ebx, eax
+    @POP_EAX                    ; value
+    mov  [ebx], al
+    pop  ebx
+    ret
+
 ; ( a b -- b a , swap top two cells )
 SWAP:
-DICT_ENTRY 'swap', STORE_ADDR, _swap_asm
+DICT_ENTRY 'swap', STORE_8_ADDR, _swap_asm
 _swap_asm:
     @POP_EAX
     push eax
