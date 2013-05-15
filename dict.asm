@@ -1,9 +1,13 @@
 
 %include "defines.inc"
 
-extern _itoa
+
 extern dsp
 extern dsentinel
+extern rsp_
+extern rsentinel
+
+extern _itoa
 extern forth_stack_depth
 extern scratch
 extern _putstr

@@ -37,18 +37,25 @@ section .data
 %endif
 
 %define STACK_SIZE      128
+%define RTN_STACK_SIZE  STACK_SIZE
 %define INPUT_BUFSIZE   128
 %define SCRATCH_BUFSIZE 128
 
-global dict
 global dsp
 global dsentinel
+global rsp_
+global rsentinel
+
+global dict
 global scratch
 
 section .bss
     dstack:         resd STACK_SIZE         ; data-stack - no overflow detection
     dsentinel:      resd 1                  ; top of the stack - sentinel value to detect underflow
     dsp:            resd 1                  ; data-stack pointer (current stack head)
+    rstack:         resd RTN_STACK_SIZE     ; return-stack
+    rsentinel:      resd 1                  ; top of return stack - sentinel value to detect underflow
+    rsp_:           resd 1                  ; return-stack pointer (current stack head) (rsp_ and not rsp b/c rsp is 64-bit sp (like esp is 32 bit) to NASM)
     dict:           resd 1                  ; pointer to start of dictionary list (H)
     input:          resb INPUT_BUFSIZE
     input_p:        resd 1                  ; pointer to current location in input
@@ -229,10 +236,7 @@ _gets:
 
 ; init globals
 init:
-    mov  [dsentinel], DWORD 0badd00dh   ; assign sentinel value to help to see if clobbered
-    mov  [dsp], DWORD dsentinel         ; compute top of stack/S0
     mov  [dict], DWORD H                ; start of our dictionary - the last primitive Forth word defined
-    mov  [input_p], DWORD input
     mov  [eof], BYTE 0                  ; seen EOF on input?
     ret
 
@@ -349,6 +353,13 @@ execute:
 
 ; Forth's quit - outer loop that calls INTERPRET
 quit:
+.init:                      ; initial setup - not in loop else no values could be stored on stack between input lines :)
+    mov  [dsentinel], DWORD 0badd00dh   ; assign sentinel value to help to see if clobbered
+    mov  [dsp], DWORD dsentinel         ; compute top of stack/S0
+
+    mov  [rsentinel], DWORD 0bad1deah   ; assign sentinel value to help to see if clobbered
+    mov  [rsp_], DWORD rsentinel        ; compute top of stack/R0
+
 .loop:
     mov  [input_p], DWORD input
     call _gets              ; leaves string in [input]
