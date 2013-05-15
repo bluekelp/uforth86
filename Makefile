@@ -1,7 +1,10 @@
 
-EXECUTABLE=uforth
+OUTPUT=bin
+
+EXECUTABLE=$(OUTPUT)/uforth
+OBJECTS=$(OUTPUT)/uforth.o $(OUTPUT)/cstring.o $(OUTPUT)/dict.o
+
 SOURCES=uforth.asm cstring.asm dict.asm
-OBJECTS=uforth.o cstring.o dict.o
 
 AS=nasm
 ASFLAGS=-g
@@ -10,6 +13,8 @@ RM=rm -f
 
 LD=ld
 LDFLAGS=
+
+CP=cp
 
 
 UNAME_S := $(shell uname -s)
@@ -25,9 +30,6 @@ endif
 # delete default suffix list
 .SUFFIXES:
 
-# NB - .asm isn't a default suffix known to make(1) (but .a and probably .as and .S are)
-.SUFFIXES: .asm .o
-
 .PHONY: default
 default: $(SOURCES) $(EXECUTABLE)
 
@@ -38,11 +40,14 @@ all: default
 run: $(EXECUTABLE)
 	@./$(EXECUTABLE)
 
-$(EXECUTABLE): $(OBJECTS)
+$(OUTPUT):
+	@mkdir -p $(OUTPUT)
+
+$(EXECUTABLE): $(OUTPUT) $(OBJECTS)
 	@$(LD) $(LDFLAGS) -o $(EXECUTABLE) $(OBJECTS)
 
-.asm.o:
-	@$(AS) $(ASFLAGS) $<
+$(OUTPUT)/%.o: %.asm
+	@$(AS) $(ASFLAGS) -o $@ $^
 
 .PHONY: clean
 clean:
