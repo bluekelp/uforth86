@@ -222,17 +222,17 @@ DICT_ENTRY 'rot', SWAP, _rot_asm
 _rot_asm:
     C_prologue 12
     @POP_EAX
-    mov C_local(3), eax
+    mov  C_local(3), eax
     @POP_EAX
-    mov C_local(2), eax
+    mov  C_local(2), eax
     @POP_EAX
-    mov C_local(1), eax
-    ; j
-    mov eax, C_local(2)
+    mov  C_local(1), eax
+
+    mov  eax, C_local(2)
     @PUSH_EAX
-    mov eax, C_local(3)
+    mov  eax, C_local(3)
     @PUSH_EAX
-    mov eax, C_local(1)
+    mov  eax, C_local(1)
     @PUSH_EAX
     C_epilogue
     ret
