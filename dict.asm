@@ -45,6 +45,7 @@ _push_asm:
 POP_EAX:
 DICT_ENTRY 'pop_eax', PUSH_EAX, _pop_asm
 _pop_asm:
+    push ebx
     mov  ebx, [dsp]         ; load pointer
     cmp  ebx, dsentinel
     jae  .underflow
@@ -55,6 +56,7 @@ _pop_asm:
 .underflow:
     mov  eax, 0
 .exit:
+    pop  ebx
     ret
 
 ; ( c -- , pops a cell and prints its first byte to stdout )
